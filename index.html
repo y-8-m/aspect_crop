@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aspect Crop</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="toolbar">
+        <div class="toolbar-group toolbar-group-open">
+          <button id="open-button" class="icon-button" type="button" aria-label="Open image files" title="Open image files">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+              <path
+                d="M12 10.5v5M9.5 13h5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </button>
+          <input
+            id="file-input"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+            multiple
+            hidden
+          />
+        </div>
+
+        <div class="toolbar-group toolbar-group-aspect">
+          <div class="ratio-group">
+            <select id="ratio-select" aria-label="Aspect ratio"></select>
+          </div>
+          <div id="orientation-toggle" class="orientation-toggle" role="group" aria-label="Aspect orientation">
+            <button
+              id="landscape-orientation-button"
+              class="orientation-choice landscape"
+              type="button"
+              aria-label="Use landscape orientation"
+              title="Use landscape orientation"
+            >
+              <span id="landscape-ratio-label" class="orientation-label"></span>
+            </button>
+            <button
+              id="portrait-orientation-button"
+              class="orientation-choice portrait"
+              type="button"
+              aria-label="Use portrait orientation"
+              title="Use portrait orientation"
+            >
+              <span id="portrait-ratio-label" class="orientation-label"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar-group toolbar-group-size" aria-label="Crop size in pixels">
+          <input
+            id="crop-width-input"
+            class="crop-dimension-input"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            aria-label="Crop width in pixels"
+            title="Crop width in pixels"
+            placeholder="W"
+            disabled
+          />
+          <span class="crop-dimension-separator" aria-hidden="true">×</span>
+          <input
+            id="crop-height-input"
+            class="crop-dimension-input"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            aria-label="Crop height in pixels"
+            title="Crop height in pixels"
+            placeholder="H"
+            disabled
+          />
+          <span class="crop-dimension-unit">px</span>
+        </div>
+
+        <div class="toolbar-group toolbar-group-actions">
+          <button id="preview-button" type="button" disabled>Preview</button>
+          <button id="save-button" class="icon-button" type="button" disabled aria-label="Save PNG" title="Save PNG">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 20v-6h8v6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </button>
+          <button
+            id="add-ratio-button"
+            class="icon-button"
+            type="button"
+            aria-label="Aspect ratio settings"
+            title="Aspect ratio settings"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 7h11M4 17h16M15 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM9 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="canvas-panel" id="drop-zone">
+          <canvas id="editor-canvas"></canvas>
+          <p class="drop-hint" id="drop-hint">Drop images here or use Open.</p>
+        </section>
+      </main>
+
+      <footer class="status-row">
+        <span id="status-text">Ready.</span>
+        <span id="image-size">Image: -</span>
+        <span id="crop-size">Crop: -</span>
+      </footer>
+    </div>
+
+    <div id="preview-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <header class="modal-header">
+          <h2>Crop Preview</h2>
+          <button id="close-preview" type="button">Close</button>
+        </header>
+        <div class="preview-body">
+          <img id="preview-image" alt="Crop preview" />
+        </div>
+      </div>
+    </div>
+
+    <div id="ratio-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ratio-modal-title">
+      <div class="modal-content ratio-modal-content">
+        <header class="modal-header">
+          <h2 id="ratio-modal-title">Aspect Ratio Settings</h2>
+          <button id="close-ratio-modal" type="button">Close</button>
+        </header>
+        <div class="ratio-modal-body">
+          <form id="ratio-form" class="ratio-form">
+            <p class="ratio-form-copy">Create a custom fixed aspect ratio. It will be saved for the next launch too.</p>
+            <div class="ratio-form-grid">
+              <label for="ratio-width-input">
+                Width
+                <input id="ratio-width-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
+              </label>
+              <label for="ratio-height-input">
+                Height
+                <input id="ratio-height-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
+              </label>
+            </div>
+            <p id="ratio-form-error" class="ratio-form-error hidden" aria-live="polite"></p>
+            <div class="ratio-form-actions">
+              <button id="save-ratio-button" type="submit">Add Ratio</button>
+            </div>
+          </form>
+          <section class="custom-ratio-section" aria-labelledby="custom-ratio-title">
+            <div class="custom-ratio-header">
+              <h3 id="custom-ratio-title">Custom Ratios</h3>
+              <p>Pick a saved ratio, move it, or delete it.</p>
+            </div>
+            <div id="custom-ratio-list" class="custom-ratio-list"></div>
+            <p id="custom-ratio-empty" class="custom-ratio-empty hidden">No custom ratios yet.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
