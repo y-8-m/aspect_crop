@@ -95,7 +95,7 @@
 
         <div class="toolbar-group toolbar-group-actions">
           <button id="preview-button" type="button" disabled>Preview</button>
-          <button id="save-button" class="icon-button" type="button" disabled aria-label="Save PNG" title="Save PNG">
+          <button id="save-button" class="icon-button" type="button" disabled aria-label="Save cropped image" title="Save cropped image">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 20v-6h8v6"
@@ -111,8 +111,8 @@
             id="add-ratio-button"
             class="icon-button"
             type="button"
-            aria-label="Aspect ratio settings"
-            title="Aspect ratio settings"
+            aria-label="Settings"
+            title="Settings"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -157,10 +157,29 @@
     <div id="ratio-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ratio-modal-title">
       <div class="modal-content ratio-modal-content">
         <header class="modal-header">
-          <h2 id="ratio-modal-title">Aspect Ratio Settings</h2>
+          <h2 id="ratio-modal-title">Settings</h2>
           <button id="close-ratio-modal" type="button">Close</button>
         </header>
         <div class="ratio-modal-body">
+          <section class="settings-section" aria-labelledby="export-format-title">
+            <div class="custom-ratio-header">
+              <h3 id="export-format-title">Export</h3>
+              <p>Choose how cropped images should be saved.</p>
+            </div>
+            <label class="settings-field" for="output-format-select">
+              Export Format
+              <select id="output-format-select" aria-label="Export format">
+                <option value="same">Same as Original</option>
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+                <option value="webp">WebP</option>
+                <option value="bmp">BMP</option>
+              </select>
+            </label>
+            <p class="settings-field-help">
+              PNG and BMP stay lossless. WebP is saved losslessly. JPEG uses the highest quality.
+            </p>
+          </section>
           <form id="ratio-form" class="ratio-form">
             <p class="ratio-form-copy">Create a custom fixed aspect ratio. It will be saved for the next launch too.</p>
             <div class="ratio-form-grid">

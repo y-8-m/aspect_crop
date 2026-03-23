@@ -10,7 +10,7 @@ A small macOS desktop utility for fixed-aspect image cropping.
 - Move and resize crop frame while keeping the selected aspect
 - Crop frame is constrained inside image bounds
 - Preview cropped result
-- Save as PNG without scaling original pixels
+- Save in the selected format without scaling original pixels
 - Reject unsupported input formats
 
 ## Controls

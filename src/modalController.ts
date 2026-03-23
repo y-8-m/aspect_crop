@@ -14,7 +14,7 @@ type ModalControllerOptions = {
   closePreviewButton: HTMLButtonElement;
   ratioModal: HTMLDivElement;
   closeRatioButton: HTMLButtonElement;
-  ratioWidthInput: HTMLInputElement;
+  ratioInitialFocus: HTMLElement;
   prepareRatioModal: () => void;
   onCloseRatio: () => void;
 };
@@ -26,7 +26,7 @@ export function createModalController(options: ModalControllerOptions): ModalCon
     closePreviewButton,
     ratioModal,
     closeRatioButton,
-    ratioWidthInput,
+    ratioInitialFocus,
     prepareRatioModal,
     onCloseRatio
   } = options;
@@ -66,8 +66,10 @@ export function createModalController(options: ModalControllerOptions): ModalCon
     openRatio(): void {
       prepareRatioModal();
       ratioModal.classList.remove("hidden");
-      ratioWidthInput.focus();
-      ratioWidthInput.select();
+      ratioInitialFocus.focus();
+      if (ratioInitialFocus instanceof HTMLInputElement) {
+        ratioInitialFocus.select();
+      }
     },
     closeRatio,
     isRatioOpen(): boolean {

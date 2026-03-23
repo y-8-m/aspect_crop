@@ -35,10 +35,14 @@ export type WindowBounds = {
   height: number;
 };
 
+export type OutputFormat = "png" | "jpeg" | "webp" | "bmp" | "gif";
+
+export type OutputFormatChoice = "same" | OutputFormat;
+
 export type OutputCrop = Rect;
 
 export type LoadedImageSource =
   | { kind: "path"; path: string }
-  | { kind: "memory" };
+  | { kind: "memory"; bytes: Uint8Array };
 
 export type PathBatchSource = "drop" | "open";
