@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/tauri";
 
-import type { OutputCrop, WindowBounds } from "./appTypes";
+import type { OutputCrop, OutputFormat, WindowBounds } from "./appTypes";
 
 type TauriDialogApi = typeof import("@tauri-apps/api/dialog");
 type TauriWindowApi = typeof import("@tauri-apps/api/window");
@@ -22,8 +22,19 @@ export type RuntimeBridge = {
   readImageBytes(path: string): Promise<Uint8Array>;
   openImageWindows(paths: string[], templateBounds: WindowBounds | null): Promise<void>;
   takeStartupPath(): Promise<string | null>;
-  savePng(defaultName: string, bytes: Uint8Array): Promise<SaveResult>;
-  saveCroppedPngFromPath(sourcePath: string, defaultName: string, crop: OutputCrop): Promise<SaveResult>;
+  saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat): Promise<SaveResult>;
+  saveCroppedImageFromPath(
+    sourcePath: string,
+    defaultName: string,
+    crop: OutputCrop,
+    format: OutputFormat
+  ): Promise<SaveResult>;
+  saveCroppedImageFromBytes(
+    sourceBytes: Uint8Array,
+    defaultName: string,
+    crop: OutputCrop,
+    format: OutputFormat
+  ): Promise<SaveResult>;
   restoreWindowBounds(bounds: WindowBounds): Promise<void>;
   onWindowBoundsChanged(listener: () => void): Promise<void>;
   currentWindowBounds(minWidth: number, minHeight: number): Promise<WindowBounds | null>;
@@ -71,46 +82,70 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       const windowLabel = await this.getWindowLabel();
       return invoke<string | null>("take_window_file_path", { windowLabel });
     },
-    async savePng(defaultName: string, bytes: Uint8Array): Promise<SaveResult> {
+    async saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
-      const savePath = await save({
-        defaultPath: defaultName,
-        filters: [{ name: "PNG Image", extensions: ["png"] }]
-      });
+      const savePath = await save(saveDialogOptions(defaultName, format));
 
       if (!savePath) {
         return { kind: "cancelled" };
       }
 
-      await invoke("save_png_file", {
-        path: savePath,
-        pngBase64: bytesToBase64(bytes)
+      const resolvedPath = normalizeSavePath(savePath, format);
+
+      await invoke("save_image_file", {
+        path: resolvedPath,
+        imageBase64: bytesToBase64(bytes)
       });
 
-      return { kind: "saved", location: savePath };
+      return { kind: "saved", location: resolvedPath };
     },
-    async saveCroppedPngFromPath(
+    async saveCroppedImageFromPath(
       sourcePath: string,
       defaultName: string,
-      crop: OutputCrop
+      crop: OutputCrop,
+      format: OutputFormat
     ): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
-      const savePath = await save({
-        defaultPath: defaultName,
-        filters: [{ name: "PNG Image", extensions: ["png"] }]
-      });
+      const savePath = await save(saveDialogOptions(defaultName, format));
 
       if (!savePath) {
         return { kind: "cancelled" };
       }
 
-      await invoke("crop_image_to_png_file", {
+      const resolvedPath = normalizeSavePath(savePath, format);
+
+      await invoke("crop_image_to_file", {
         sourcePath,
-        outputPath: savePath,
-        crop
+        outputPath: resolvedPath,
+        crop,
+        format
       });
 
-      return { kind: "saved", location: savePath };
+      return { kind: "saved", location: resolvedPath };
+    },
+    async saveCroppedImageFromBytes(
+      sourceBytes: Uint8Array,
+      defaultName: string,
+      crop: OutputCrop,
+      format: OutputFormat
+    ): Promise<SaveResult> {
+      const { save } = await getTauriDialogApi();
+      const savePath = await save(saveDialogOptions(defaultName, format));
+
+      if (!savePath) {
+        return { kind: "cancelled" };
+      }
+
+      const resolvedPath = normalizeSavePath(savePath, format);
+
+      await invoke("crop_image_data_to_file", {
+        sourceBase64: bytesToBase64(sourceBytes),
+        outputPath: resolvedPath,
+        crop,
+        format
+      });
+
+      return { kind: "saved", location: resolvedPath };
     },
     async restoreWindowBounds(bounds: WindowBounds): Promise<void> {
       const { appWindow, PhysicalPosition, PhysicalSize } = await getTauriWindowApi();
@@ -175,11 +210,14 @@ function createWebRuntimeBridge(): RuntimeBridge {
     async takeStartupPath(): Promise<string | null> {
       return null;
     },
-    async savePng(defaultName: string, bytes: Uint8Array): Promise<SaveResult> {
-      downloadBytes(defaultName, bytes, "image/png");
+    async saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat): Promise<SaveResult> {
+      downloadBytes(defaultName, bytes, mimeTypeForFormat(format));
       return { kind: "downloaded", location: defaultName };
     },
-    async saveCroppedPngFromPath(): Promise<SaveResult> {
+    async saveCroppedImageFromPath(): Promise<SaveResult> {
+      throw new Error("Native crop-save requires the desktop app runtime.");
+    },
+    async saveCroppedImageFromBytes(): Promise<SaveResult> {
       throw new Error("Native crop-save requires the desktop app runtime.");
     },
     async restoreWindowBounds(): Promise<void> {},
@@ -220,6 +258,83 @@ function downloadBytes(fileName: string, bytes: Uint8Array, mimeType: string): v
   window.setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 0);
+}
+
+function saveDialogOptions(defaultName: string, format: OutputFormat): {
+  defaultPath: string;
+  filters: { name: string; extensions: string[] }[];
+} {
+  return {
+    defaultPath: defaultName,
+    filters: [
+      {
+        name: outputFormatLabel(format),
+        extensions: outputFormatExtensions(format)
+      }
+    ]
+  };
+}
+
+function outputFormatLabel(format: OutputFormat): string {
+  switch (format) {
+    case "png":
+      return "PNG Image";
+    case "jpeg":
+      return "JPEG Image";
+    case "webp":
+      return "WebP Image";
+    case "bmp":
+      return "BMP Image";
+    case "gif":
+      return "GIF Image";
+  }
+}
+
+function outputFormatExtensions(format: OutputFormat): string[] {
+  switch (format) {
+    case "jpeg":
+      return ["jpg", "jpeg"];
+    default:
+      return [format];
+  }
+}
+
+function preferredExtension(format: OutputFormat): string {
+  return format === "jpeg" ? "jpg" : format;
+}
+
+function normalizeSavePath(path: string, format: OutputFormat): string {
+  const validExtensions = new Set(outputFormatExtensions(format));
+  const slashIndex = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  const directory = slashIndex >= 0 ? path.slice(0, slashIndex + 1) : "";
+  const fileName = slashIndex >= 0 ? path.slice(slashIndex + 1) : path;
+  const dotIndex = fileName.lastIndexOf(".");
+
+  if (dotIndex > 0 && dotIndex < fileName.length - 1) {
+    const currentExtension = fileName.slice(dotIndex + 1).toLowerCase();
+    if (validExtensions.has(currentExtension)) {
+      return path;
+    }
+
+    return `${directory}${fileName.slice(0, dotIndex)}.${preferredExtension(format)}`;
+  }
+
+  return `${path}.${preferredExtension(format)}`;
+}
+
+function mimeTypeForFormat(format: OutputFormat): string {
+  switch (format) {
+    case "png":
+      return "image/png";
+    case "jpeg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    case "bmp":
+      return "image/bmp";
+    case "gif":
+      return "image/gif";
+  }
 }
 
 function base64ToBytes(base64: string): Uint8Array {

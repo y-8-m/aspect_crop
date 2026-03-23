@@ -4,6 +4,8 @@ import type {
   Handle,
   LoadedImageSource,
   OutputCrop,
+  OutputFormat,
+  OutputFormatChoice,
   PathBatchSource,
   Point,
   Rect,
@@ -31,8 +33,10 @@ const LEGACY_SELECTED_ASPECT_STORAGE_KEY = "photo-trimer.selected-aspect-preset"
 const LEGACY_WINDOW_BOUNDS_STORAGE_KEY = "photo-trimer.window-bounds";
 const CUSTOM_ASPECT_STORAGE_KEY = "aspect-crop.custom-aspect-presets";
 const SELECTED_ASPECT_STORAGE_KEY = "aspect-crop.selected-aspect-preset";
+const OUTPUT_FORMAT_STORAGE_KEY = "aspect-crop.output-format";
 const WINDOW_BOUNDS_STORAGE_KEY = "aspect-crop.window-bounds";
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp"]);
+const EXPORTABLE_OUTPUT_FORMATS: OutputFormat[] = ["png", "jpeg", "webp", "bmp"];
 const WINDOW_BOUNDS_SAVE_DELAY_MS = 180;
 const MIN_WINDOW_WIDTH = 640;
 const MIN_WINDOW_HEIGHT = 480;
@@ -54,6 +58,7 @@ const runtime = createRuntimeBridge();
 const isTauriRuntime = runtime.kind === "tauri";
 const initialAspectPresets = mergeAspectPresets(BUILT_IN_ASPECT_PRESETS, loadCustomAspectPresets());
 const initialSelectedAspectId = loadSelectedAspectPresetId(initialAspectPresets);
+const initialOutputFormatChoice = loadOutputFormatChoice();
 
 const canvas = must<HTMLCanvasElement>("#editor-canvas");
 const dropZone = must<HTMLDivElement>("#drop-zone");
@@ -79,6 +84,7 @@ const previewImage = must<HTMLImageElement>("#preview-image");
 const closePreview = must<HTMLButtonElement>("#close-preview");
 const ratioModal = must<HTMLDivElement>("#ratio-modal");
 const closeRatioModal = must<HTMLButtonElement>("#close-ratio-modal");
+const outputFormatSelect = must<HTMLSelectElement>("#output-format-select");
 const ratioForm = must<HTMLFormElement>("#ratio-form");
 const ratioWidthInput = must<HTMLInputElement>("#ratio-width-input");
 const ratioHeightInput = must<HTMLInputElement>("#ratio-height-input");
@@ -94,6 +100,7 @@ const state = {
   imageSource: null as LoadedImageSource | null,
   aspectPresets: initialAspectPresets,
   selectedAspectId: initialSelectedAspectId,
+  outputFormatChoice: initialOutputFormatChoice,
   isAspectSwapped: false,
   aspect: aspectValueFromPresetId(initialSelectedAspectId, initialAspectPresets),
   crop: null as Rect | null,
@@ -108,8 +115,9 @@ const modalController = createModalController({
   closePreviewButton: closePreview,
   ratioModal,
   closeRatioButton: closeRatioModal,
-  ratioWidthInput,
+  ratioInitialFocus: outputFormatSelect,
   prepareRatioModal: () => {
+    syncOutputFormatSelect();
     setRatioFormValues(currentAspectDimensions());
     clearRatioFormError();
     renderCustomAspectList();
@@ -136,6 +144,7 @@ const fileDropController = createFileDropController({
   supportedUniquePaths
 });
 
+syncOutputFormatSelect();
 syncAspectUi();
 setupEvents();
 void setupWindowStatePersistence();
@@ -179,6 +188,17 @@ function setupEvents(): void {
 
   ratioSelect.addEventListener("change", () => {
     applyAspectPreset(ratioSelect.value);
+  });
+
+  outputFormatSelect.addEventListener("change", () => {
+    const choice = parseOutputFormatChoice(outputFormatSelect.value);
+    if (!choice) {
+      syncOutputFormatSelect();
+      return;
+    }
+
+    state.outputFormatChoice = choice;
+    persistOutputFormatChoice(choice);
   });
 
   cropWidthInput.addEventListener("input", () => {
@@ -621,7 +641,7 @@ async function loadImageFromFile(file: File): Promise<void> {
   const bytes = new Uint8Array(buffer);
   const image = await decodeImage(bytes);
 
-  applyLoadedImage(image, file.name, { kind: "memory" });
+  applyLoadedImage(image, file.name, { kind: "memory", bytes });
 }
 
 async function loadImageFromPath(path: string): Promise<void> {
@@ -1028,7 +1048,7 @@ function roundedOutputCrop(): OutputCrop {
 }
 
 async function makePreviewUrl(): Promise<string> {
-  const bytes = await makePngBytes();
+  const bytes = await makeImageBytes("png");
   const blob = new Blob([toArrayBuffer(bytes)], { type: "image/png" });
   return URL.createObjectURL(blob);
 }
@@ -1043,7 +1063,7 @@ function clearPreview(): void {
   }
 }
 
-async function makePngBytes(): Promise<Uint8Array> {
+function renderCroppedCanvas(): HTMLCanvasElement {
   if (!state.image || !state.crop) {
     throw new Error("No image loaded.");
   }
@@ -1070,14 +1090,31 @@ async function makePngBytes(): Promise<Uint8Array> {
     crop.height
   );
 
+  return buffer;
+}
+
+async function makeImageBytes(format: OutputFormat): Promise<Uint8Array> {
+  if (!isBrowserEncodedFormat(format)) {
+    throw new Error(`${outputFormatLabel(format)} export requires the desktop app runtime.`);
+  }
+
+  const buffer = renderCroppedCanvas();
+  const options = browserEncodingOptions(format);
+
   const blob = await new Promise<Blob>((resolve, reject) => {
     buffer.toBlob((result) => {
       if (!result) {
-        reject(new Error("Failed to create PNG blob."));
+        reject(new Error(`Failed to create ${outputFormatLabel(format)} image.`));
         return;
       }
+
+      if (result.type !== options.mimeType) {
+        reject(new Error(`${outputFormatLabel(format)} export is unavailable in this runtime.`));
+        return;
+      }
+
       resolve(result);
-    }, "image/png");
+    }, options.mimeType, options.quality);
   });
 
   return new Uint8Array(await blob.arrayBuffer());
@@ -1357,6 +1394,11 @@ function loadSelectedAspectPresetId(presets: AspectPreset[]): string {
   return presets.some((preset) => preset.id === storedId) ? storedId : initialAspectPresetId(presets);
 }
 
+function loadOutputFormatChoice(): OutputFormatChoice {
+  const storedChoice = localStorage.getItem(OUTPUT_FORMAT_STORAGE_KEY);
+  return parseOutputFormatChoice(storedChoice) ?? "same";
+}
+
 function loadCustomAspectPresets(): AspectPreset[] {
   const raw = loadStorageValue(CUSTOM_ASPECT_STORAGE_KEY, LEGACY_CUSTOM_ASPECT_STORAGE_KEY);
   if (!raw) {
@@ -1414,6 +1456,10 @@ function persistCustomAspectPresets(): void {
 
 function persistSelectedAspectPresetId(presetId: string): void {
   localStorage.setItem(SELECTED_ASPECT_STORAGE_KEY, presetId);
+}
+
+function persistOutputFormatChoice(choice: OutputFormatChoice): void {
+  localStorage.setItem(OUTPUT_FORMAT_STORAGE_KEY, choice);
 }
 
 function loadWindowBounds(): WindowBounds | null {
@@ -1517,15 +1563,28 @@ async function saveCroppedImage(): Promise<void> {
     return;
   }
 
-  const defaultName = buildDefaultFileName(state.imageName || "cropped");
+  const outputFormat = resolvedOutputFormat();
+  const defaultName = buildDefaultFileName(state.imageName || "cropped", outputFormat);
   const crop = roundedOutputCrop();
   let result: SaveResult;
 
   if (isTauriRuntime && state.imageSource?.kind === "path") {
-    result = await runtime.saveCroppedPngFromPath(state.imageSource.path, defaultName, crop);
+    result = await runtime.saveCroppedImageFromPath(
+      state.imageSource.path,
+      defaultName,
+      crop,
+      outputFormat
+    );
+  } else if (isTauriRuntime && state.imageSource?.kind === "memory") {
+    result = await runtime.saveCroppedImageFromBytes(
+      state.imageSource.bytes,
+      defaultName,
+      crop,
+      outputFormat
+    );
   } else {
-    const bytes = await makePngBytes();
-    result = await runtime.savePng(defaultName, bytes);
+    const bytes = await makeImageBytes(outputFormat);
+    result = await runtime.saveImage(defaultName, bytes, outputFormat);
   }
 
   applySaveResult(result);
@@ -1617,10 +1676,78 @@ function fileNameFromPath(path: string): string {
   return parts[parts.length - 1] || "image";
 }
 
-function buildDefaultFileName(originalName: string): string {
+function syncOutputFormatSelect(): void {
+  outputFormatSelect.value = state.outputFormatChoice;
+}
+
+function parseOutputFormatChoice(value: string | null): OutputFormatChoice | null {
+  if (value === "same") {
+    return value;
+  }
+
+  return isOutputFormat(value) ? value : null;
+}
+
+function isOutputFormat(value: string | null): value is OutputFormat {
+  return value !== null && EXPORTABLE_OUTPUT_FORMATS.includes(value as OutputFormat);
+}
+
+function resolvedOutputFormat(): OutputFormat {
+  return resolveOutputFormatChoice(state.outputFormatChoice, state.imageName);
+}
+
+function resolveOutputFormatChoice(choice: OutputFormatChoice, imageName: string): OutputFormat {
+  if (choice !== "same") {
+    return choice;
+  }
+
+  const extension = imageExtension(imageName);
+  if (extension === "jpg" || extension === "jpeg") {
+    return "jpeg";
+  }
+
+  if (extension === "png" || extension === "webp" || extension === "bmp" || extension === "gif") {
+    return extension;
+  }
+
+  return "png";
+}
+
+function preferredOutputExtension(format: OutputFormat): string {
+  return format === "jpeg" ? "jpg" : format;
+}
+
+function outputFormatLabel(format: OutputFormat): string {
+  switch (format) {
+    case "png":
+      return "PNG";
+    case "jpeg":
+      return "JPEG";
+    case "webp":
+      return "WebP";
+    case "bmp":
+      return "BMP";
+    case "gif":
+      return "GIF";
+  }
+}
+
+function isBrowserEncodedFormat(format: OutputFormat): format is "png" | "jpeg" {
+  return format === "png" || format === "jpeg";
+}
+
+function browserEncodingOptions(format: "png" | "jpeg"): { mimeType: string; quality?: number } {
+  if (format === "jpeg") {
+    return { mimeType: "image/jpeg", quality: 1 };
+  }
+
+  return { mimeType: "image/png" };
+}
+
+function buildDefaultFileName(originalName: string, format: OutputFormat): string {
   const dot = originalName.lastIndexOf(".");
   const base = dot > 0 ? originalName.slice(0, dot) : originalName;
-  return `${base}_crop.png`;
+  return `${base}_crop.${preferredOutputExtension(format)}`;
 }
 
 function asMessage(value: unknown): string {
