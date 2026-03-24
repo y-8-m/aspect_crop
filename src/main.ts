@@ -5,7 +5,6 @@ import type {
   LoadedImageSource,
   OutputCrop,
   OutputFormat,
-  OutputFormatChoice,
   PathBatchSource,
   Point,
   Rect,
@@ -22,8 +21,18 @@ import {
   scaleCropFromCenter
 } from "./cropGeometry";
 import { createFileDropController } from "./fileDropController";
+import { ensureNonAnimatedImage } from "./imageAnimationGuard";
 import { createModalController } from "./modalController";
+import {
+  browserEncodingOptions,
+  isBrowserEncodedFormat,
+  outputFormatLabel,
+  parseOutputFormatChoice,
+  preferredOutputExtension,
+  resolveOutputFormatChoice
+} from "./outputFormat";
 import { createRuntimeBridge, type SaveResult } from "./runtimeBridge";
+import { loadOutputFormatChoice, persistOutputFormatChoice } from "./settingsStore";
 
 const HANDLE_SIZE = 12;
 const MULTI_IMAGE_CONFIRM_THRESHOLD = 10;
@@ -33,10 +42,8 @@ const LEGACY_SELECTED_ASPECT_STORAGE_KEY = "photo-trimer.selected-aspect-preset"
 const LEGACY_WINDOW_BOUNDS_STORAGE_KEY = "photo-trimer.window-bounds";
 const CUSTOM_ASPECT_STORAGE_KEY = "aspect-crop.custom-aspect-presets";
 const SELECTED_ASPECT_STORAGE_KEY = "aspect-crop.selected-aspect-preset";
-const OUTPUT_FORMAT_STORAGE_KEY = "aspect-crop.output-format";
 const WINDOW_BOUNDS_STORAGE_KEY = "aspect-crop.window-bounds";
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp"]);
-const EXPORTABLE_OUTPUT_FORMATS: OutputFormat[] = ["png", "jpeg", "webp", "bmp"];
 const WINDOW_BOUNDS_SAVE_DELAY_MS = 180;
 const MIN_WINDOW_WIDTH = 640;
 const MIN_WINDOW_HEIGHT = 480;
@@ -639,7 +646,7 @@ async function loadImageFromFile(file: File): Promise<void> {
   ensureSupportedFileInput(file);
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  ensureNonAnimatedImage(bytes, file.name);
+  ensureNonAnimatedImage(bytes, imageExtension(file.name));
   const image = await decodeImage(bytes);
 
   applyLoadedImage(image, file.name, { kind: "memory", bytes });
@@ -652,7 +659,7 @@ async function loadImageFromPath(path: string): Promise<void> {
 
   ensureSupportedPath(path);
   const bytes = await runtime.readImageBytes(path);
-  ensureNonAnimatedImage(bytes, path);
+  ensureNonAnimatedImage(bytes, imageExtension(path));
   const image = await decodeImage(bytes);
 
   applyLoadedImage(image, fileNameFromPath(path), { kind: "path", path });
@@ -1396,11 +1403,6 @@ function loadSelectedAspectPresetId(presets: AspectPreset[]): string {
   return presets.some((preset) => preset.id === storedId) ? storedId : initialAspectPresetId(presets);
 }
 
-function loadOutputFormatChoice(): OutputFormatChoice {
-  const storedChoice = localStorage.getItem(OUTPUT_FORMAT_STORAGE_KEY);
-  return parseOutputFormatChoice(storedChoice) ?? "same";
-}
-
 function loadCustomAspectPresets(): AspectPreset[] {
   const raw = loadStorageValue(CUSTOM_ASPECT_STORAGE_KEY, LEGACY_CUSTOM_ASPECT_STORAGE_KEY);
   if (!raw) {
@@ -1458,10 +1460,6 @@ function persistCustomAspectPresets(): void {
 
 function persistSelectedAspectPresetId(presetId: string): void {
   localStorage.setItem(SELECTED_ASPECT_STORAGE_KEY, presetId);
-}
-
-function persistOutputFormatChoice(choice: OutputFormatChoice): void {
-  localStorage.setItem(OUTPUT_FORMAT_STORAGE_KEY, choice);
 }
 
 function loadWindowBounds(): WindowBounds | null {
@@ -1664,185 +1662,6 @@ function ensureSupportedPath(path: string): void {
   }
 }
 
-function ensureNonAnimatedImage(bytes: Uint8Array, pathLike: string): void {
-  const extension = imageExtension(pathLike);
-  if (!extension) {
-    return;
-  }
-
-  if (extension === "png" && isAnimatedPng(bytes)) {
-    throw new Error("Animated PNG (APNG) files are not supported.");
-  }
-
-  if (extension === "gif" && isAnimatedGif(bytes)) {
-    throw new Error("Animated GIF files are not supported.");
-  }
-
-  if (extension === "webp" && isAnimatedWebP(bytes)) {
-    throw new Error("Animated WebP files are not supported.");
-  }
-}
-
-function isAnimatedPng(bytes: Uint8Array): boolean {
-  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-  if (bytes.length < pngSignature.length) {
-    return false;
-  }
-
-  for (let index = 0; index < pngSignature.length; index += 1) {
-    if (bytes[index] !== pngSignature[index]) {
-      return false;
-    }
-  }
-
-  let offset = 8;
-  while (offset + 8 <= bytes.length) {
-    const chunkLength = readUint32BE(bytes, offset);
-    const chunkType = readAscii(bytes, offset + 4, 4);
-    const nextOffset = offset + 12 + chunkLength;
-
-    if (nextOffset > bytes.length) {
-      return false;
-    }
-
-    if (chunkType === "acTL") {
-      return true;
-    }
-
-    if (chunkType === "IEND") {
-      return false;
-    }
-
-    offset = nextOffset;
-  }
-
-  return false;
-}
-
-function isAnimatedGif(bytes: Uint8Array): boolean {
-  if (bytes.length < 13) {
-    return false;
-  }
-
-  const header = readAscii(bytes, 0, 6);
-  if (header !== "GIF87a" && header !== "GIF89a") {
-    return false;
-  }
-
-  let offset = 13;
-  const packed = bytes[10] ?? 0;
-  if ((packed & 0x80) !== 0) {
-    offset += 3 * (1 << ((packed & 0x07) + 1));
-  }
-
-  let frameCount = 0;
-  while (offset < bytes.length) {
-    const blockType = bytes[offset];
-
-    if (blockType === 0x3b) {
-      return false;
-    }
-
-    if (blockType === 0x2c) {
-      frameCount += 1;
-      if (frameCount > 1) {
-        return true;
-      }
-
-      if (offset + 10 > bytes.length) {
-        return false;
-      }
-
-      const imagePacked = bytes[offset + 9] ?? 0;
-      offset += 10;
-
-      if ((imagePacked & 0x80) !== 0) {
-        offset += 3 * (1 << ((imagePacked & 0x07) + 1));
-      }
-
-      if (offset >= bytes.length) {
-        return false;
-      }
-
-      offset += 1;
-      offset = skipGifSubBlocks(bytes, offset);
-      continue;
-    }
-
-    if (blockType === 0x21) {
-      offset = skipGifExtension(bytes, offset);
-      continue;
-    }
-
-    return false;
-  }
-
-  return false;
-}
-
-function skipGifExtension(bytes: Uint8Array, offset: number): number {
-  if (offset + 2 > bytes.length) {
-    return bytes.length;
-  }
-
-  return skipGifSubBlocks(bytes, offset + 2);
-}
-
-function skipGifSubBlocks(bytes: Uint8Array, offset: number): number {
-  let cursor = offset;
-
-  while (cursor < bytes.length) {
-    const blockSize = bytes[cursor];
-    cursor += 1;
-
-    if (blockSize === 0) {
-      return cursor;
-    }
-
-    cursor += blockSize;
-  }
-
-  return bytes.length;
-}
-
-function isAnimatedWebP(bytes: Uint8Array): boolean {
-  if (bytes.length < 12) {
-    return false;
-  }
-
-  if (readAscii(bytes, 0, 4) !== "RIFF" || readAscii(bytes, 8, 4) !== "WEBP") {
-    return false;
-  }
-
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const chunkType = readAscii(bytes, offset, 4);
-    const chunkLength = readUint32LE(bytes, offset + 4);
-    const chunkDataOffset = offset + 8;
-    const paddedLength = chunkLength + (chunkLength % 2);
-    const nextOffset = chunkDataOffset + paddedLength;
-
-    if (nextOffset > bytes.length) {
-      return false;
-    }
-
-    if (chunkType === "ANIM" || chunkType === "ANMF") {
-      return true;
-    }
-
-    if (chunkType === "VP8X" && chunkLength >= 1) {
-      const featureFlags = bytes[chunkDataOffset] ?? 0;
-      if ((featureFlags & 0x02) !== 0) {
-        return true;
-      }
-    }
-
-    offset = nextOffset;
-  }
-
-  return false;
-}
-
 function imageExtension(pathLike: string): string | null {
   const fileName = fileNameFromPath(pathLike);
   const dotIndex = fileName.lastIndexOf(".");
@@ -1857,111 +1676,12 @@ function fileNameFromPath(path: string): string {
   return parts[parts.length - 1] || "image";
 }
 
-function readAscii(bytes: Uint8Array, offset: number, length: number): string {
-  if (offset < 0 || length < 0 || offset + length > bytes.length) {
-    return "";
-  }
-
-  let result = "";
-  for (let index = offset; index < offset + length; index += 1) {
-    result += String.fromCharCode(bytes[index] ?? 0);
-  }
-
-  return result;
-}
-
-function readUint32BE(bytes: Uint8Array, offset: number): number {
-  if (offset < 0 || offset + 4 > bytes.length) {
-    return 0;
-  }
-
-  return (
-    (bytes[offset] ?? 0) * 0x1000000 +
-    ((bytes[offset + 1] ?? 0) << 16) +
-    ((bytes[offset + 2] ?? 0) << 8) +
-    (bytes[offset + 3] ?? 0)
-  );
-}
-
-function readUint32LE(bytes: Uint8Array, offset: number): number {
-  if (offset < 0 || offset + 4 > bytes.length) {
-    return 0;
-  }
-
-  return (
-    (bytes[offset] ?? 0) +
-    ((bytes[offset + 1] ?? 0) << 8) +
-    ((bytes[offset + 2] ?? 0) << 16) +
-    (bytes[offset + 3] ?? 0) * 0x1000000
-  );
-}
-
 function syncOutputFormatSelect(): void {
   outputFormatSelect.value = state.outputFormatChoice;
 }
 
-function parseOutputFormatChoice(value: string | null): OutputFormatChoice | null {
-  if (value === "same") {
-    return value;
-  }
-
-  return isOutputFormat(value) ? value : null;
-}
-
-function isOutputFormat(value: string | null): value is OutputFormat {
-  return value !== null && EXPORTABLE_OUTPUT_FORMATS.includes(value as OutputFormat);
-}
-
 function resolvedOutputFormat(): OutputFormat {
-  return resolveOutputFormatChoice(state.outputFormatChoice, state.imageName);
-}
-
-function resolveOutputFormatChoice(choice: OutputFormatChoice, imageName: string): OutputFormat {
-  if (choice !== "same") {
-    return choice;
-  }
-
-  const extension = imageExtension(imageName);
-  if (extension === "jpg" || extension === "jpeg") {
-    return "jpeg";
-  }
-
-  if (extension === "png" || extension === "webp" || extension === "bmp" || extension === "gif") {
-    return extension;
-  }
-
-  return "png";
-}
-
-function preferredOutputExtension(format: OutputFormat): string {
-  return format === "jpeg" ? "jpg" : format;
-}
-
-function outputFormatLabel(format: OutputFormat): string {
-  switch (format) {
-    case "png":
-      return "PNG";
-    case "jpeg":
-      return "JPEG";
-    case "webp":
-      return "WebP";
-    case "bmp":
-      return "BMP";
-    case "gif":
-      return "GIF";
-  }
-}
-
-function isBrowserEncodedFormat(format: OutputFormat): format is "png" | "jpeg" {
-  return format === "png" || format === "jpeg";
-}
-
-function browserEncodingOptions(format: "png" | "jpeg"): { mimeType: string; quality?: number } {
-  if (format === "jpeg") {
-    return { mimeType: "image/jpeg", quality: 1 };
-  }
-
-  return { mimeType: "image/png" };
+  return resolveOutputFormatChoice(state.outputFormatChoice, imageExtension(state.imageName));
 }
 
 function buildDefaultFileName(originalName: string, format: OutputFormat): string {
