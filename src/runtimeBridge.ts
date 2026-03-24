@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/tauri";
 
 import type { OutputCrop, OutputFormat, WindowBounds } from "./appTypes";
+import {
+  mimeTypeForFormat,
+  outputFormatExtensions,
+  outputFormatLabel,
+  preferredOutputExtension
+} from "./outputFormat";
 
 type TauriDialogApi = typeof import("@tauri-apps/api/dialog");
 type TauriWindowApi = typeof import("@tauri-apps/api/window");
@@ -275,34 +281,6 @@ function saveDialogOptions(defaultName: string, format: OutputFormat): {
   };
 }
 
-function outputFormatLabel(format: OutputFormat): string {
-  switch (format) {
-    case "png":
-      return "PNG Image";
-    case "jpeg":
-      return "JPEG Image";
-    case "webp":
-      return "WebP Image";
-    case "bmp":
-      return "BMP Image";
-    case "gif":
-      return "GIF Image";
-  }
-}
-
-function outputFormatExtensions(format: OutputFormat): string[] {
-  switch (format) {
-    case "jpeg":
-      return ["jpg", "jpeg"];
-    default:
-      return [format];
-  }
-}
-
-function preferredExtension(format: OutputFormat): string {
-  return format === "jpeg" ? "jpg" : format;
-}
-
 function normalizeSavePath(path: string, format: OutputFormat): string {
   const validExtensions = new Set(outputFormatExtensions(format));
   const slashIndex = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
@@ -316,25 +294,10 @@ function normalizeSavePath(path: string, format: OutputFormat): string {
       return path;
     }
 
-    return `${directory}${fileName.slice(0, dotIndex)}.${preferredExtension(format)}`;
+    return `${directory}${fileName.slice(0, dotIndex)}.${preferredOutputExtension(format)}`;
   }
 
-  return `${path}.${preferredExtension(format)}`;
-}
-
-function mimeTypeForFormat(format: OutputFormat): string {
-  switch (format) {
-    case "png":
-      return "image/png";
-    case "jpeg":
-      return "image/jpeg";
-    case "webp":
-      return "image/webp";
-    case "bmp":
-      return "image/bmp";
-    case "gif":
-      return "image/gif";
-  }
+  return `${path}.${preferredOutputExtension(format)}`;
 }
 
 function base64ToBytes(base64: string): Uint8Array {
