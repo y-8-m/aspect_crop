@@ -1,3 +1,4 @@
+import { t, LocalizedError } from "./i18n";
 import { invoke } from "@tauri-apps/api/tauri";
 import { saveDefaultPath } from "./saveFolder";
 
@@ -69,8 +70,9 @@ function createTauriRuntimeBridge(): RuntimeBridge {
     async openImageDialog(extensions: string[]): Promise<string[]> {
       const { open } = await getTauriDialogApi();
       const selection = await open({
+        title: t("open"),
         multiple: true,
-        filters: [{ name: "Images", extensions }]
+        filters: [{ name: t("images"), extensions }]
       });
 
       if (!selection) {
@@ -95,7 +97,7 @@ function createTauriRuntimeBridge(): RuntimeBridge {
     },
     async openFolderDialog(defaultPath?: string): Promise<string | null> {
       const { open } = await getTauriDialogApi();
-      const selection = await open({ directory: true, multiple: false, defaultPath, title: "保存ダイアログの初期フォルダ" });
+      const selection = await open({ directory: true, multiple: false, defaultPath, title: t("saveFolder") });
       return typeof selection === "string" ? selection : null;
     },
     async isSaveFolderAvailable(path: string): Promise<boolean> {
@@ -225,10 +227,10 @@ function createWebRuntimeBridge(): RuntimeBridge {
       return [];
     },
     async readImageBytes(): Promise<Uint8Array> {
-      throw new Error("Reading image paths requires the desktop app runtime.");
+      throw new LocalizedError("desktopPaths");
     },
     async openImageWindows(): Promise<void> {
-      throw new Error("Opening image paths requires the desktop app runtime.");
+      throw new LocalizedError("desktopPaths");
     },
     async takeStartupPath(): Promise<string | null> {
       return null;
@@ -238,10 +240,10 @@ function createWebRuntimeBridge(): RuntimeBridge {
       return { kind: "downloaded", location: defaultName };
     },
     async saveCroppedImageFromPath(): Promise<SaveResult> {
-      throw new Error("Native crop-save requires the desktop app runtime.");
+      throw new LocalizedError("nativeSaveOnly");
     },
     async saveCroppedImageFromBytes(): Promise<SaveResult> {
-      throw new Error("Native crop-save requires the desktop app runtime.");
+      throw new LocalizedError("nativeSaveOnly");
     },
     async restoreWindowBounds(): Promise<void> {},
     async onWindowBoundsChanged(): Promise<void> {},
@@ -285,10 +287,12 @@ function downloadBytes(fileName: string, bytes: Uint8Array, mimeType: string): v
 
 function saveDialogOptions(defaultName: string, format: OutputFormat, initialFolder?: string): {
   defaultPath: string;
+  title: string;
   filters: { name: string; extensions: string[] }[];
 } {
   return {
     defaultPath: saveDefaultPath(defaultName, initialFolder),
+    title: t("save"),
     filters: [
       {
         name: outputFormatLabel(format),

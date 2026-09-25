@@ -1,5 +1,6 @@
 import type { Rect } from "./appTypes";
 import { clampZoom, fitZoom, zoomLayout } from "./zoomGeometry";
+import { t } from "./i18n";
 
 type Options = {
   viewport: HTMLElement;
@@ -35,8 +36,7 @@ export function createZoomViewport(options: Options) {
     output.value = percent;
     slider.setAttribute("aria-valuetext", percent);
     controls.classList.toggle("is-disabled", disabled);
-    controls.title = !imageWidth ? "画像を開くと表示倍率を変更できます" :
-      disabled ? "画像全体を100%で表示できます" : "全体表示〜100%";
+    controls.title = t(!imageWidth ? "zoomNeedsImage" : disabled ? "zoomFits" : "zoomRange");
   }
 
   function rememberCenter(): void {
@@ -104,6 +104,7 @@ export function createZoomViewport(options: Options) {
       refresh();
       syncControls();
     },
-    refresh
+    refresh,
+    translate: syncControls
   };
 }

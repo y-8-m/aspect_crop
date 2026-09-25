@@ -1,3 +1,4 @@
+import { msg, type Message } from "./i18n";
 import type { NativeFileDropPayload } from "./runtimeBridge";
 
 const SAME_SIGNATURE_DEDUPE_WINDOW_MS = 900;
@@ -10,8 +11,8 @@ type FileDropControllerOptions = {
   bindNativeDrop?: (listener: (payload: NativeFileDropPayload) => void) => Promise<void>;
   loadPathBatch: (paths: string[]) => Promise<void>;
   loadFile: (file: File) => Promise<string>;
-  onStatus: (message: string, isError?: boolean) => void;
-  formatError: (error: unknown) => string;
+  onStatus: (message: Message, isError?: boolean) => void;
+  formatError: (error: unknown) => Message;
   supportedUniquePaths: (paths: string[]) => string[];
 };
 
@@ -74,7 +75,7 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
           options.dropZone.classList.remove("drag-active");
           const paths = options.supportedUniquePaths(payload.paths);
           if (paths.length === 0) {
-            options.onStatus("Dropped item did not include a readable file path.", true);
+            options.onStatus(msg("dropNoPath"), true);
             return;
           }
 
@@ -109,11 +110,11 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
 
         if (files.length > 1) {
           options.onStatus(
-            `Loaded ${loadedName}. Additional files were ignored outside the desktop runtime.`,
+            msg("loadedWeb", { name: loadedName }),
             true
           );
         } else {
-          options.onStatus(`Loaded ${loadedName}.`);
+          options.onStatus(msg("loaded", { name: loadedName }));
         }
         return;
       }
@@ -128,17 +129,17 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
           return;
         }
 
-        options.onStatus("Direct file-path drops require the desktop app. Drop the file itself or use Open.", true);
+        options.onStatus(msg("dropPathDesktop"), true);
         return;
       }
 
       if (options.runtimeKind !== "tauri") {
-        options.onStatus("Drop target did not include a readable image.", true);
+        options.onStatus(msg("dropNoImage"), true);
         return;
       }
 
       scheduleNativeDropFallbackCheck(() => {
-        options.onStatus("Drop was detected, but no readable file payload arrived.", true);
+        options.onStatus(msg("dropNoPayload"), true);
       });
     } catch (error) {
       options.onStatus(options.formatError(error), true);
@@ -158,7 +159,7 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
   async function handleDroppedFileFallback(files: File[]): Promise<void> {
     const [firstFile] = files;
     if (!firstFile) {
-      options.onStatus("Drop was detected, but no readable image payload arrived.", true);
+      options.onStatus(msg("dropNoPayload"), true);
       return;
     }
 
@@ -172,11 +173,11 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
 
       if (files.length > 1) {
         options.onStatus(
-          `Loaded ${loadedName}. Native file paths were unavailable, so ${files.length - 1} additional image(s) were skipped.`,
+          msg("loadedSkipped", { name: loadedName, count: files.length - 1 }),
           true
         );
       } else {
-        options.onStatus(`Loaded ${loadedName}.`);
+        options.onStatus(msg("loaded", { name: loadedName }));
       }
     } catch (error) {
       options.onStatus(options.formatError(error), true);
