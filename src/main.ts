@@ -136,6 +136,11 @@ const customRatioList = must<HTMLDivElement>("#custom-ratio-list");
 const customRatioEmpty = must<HTMLParagraphElement>("#custom-ratio-empty");
 
 const ctx = get2dContext(canvas);
+const themeColors = getComputedStyle(document.documentElement);
+const cropColors = {
+  outline: themeColors.getPropertyValue("--control-bg").trim(),
+  handle: themeColors.getPropertyValue("--accent").trim()
+};
 
 const state = {
   image: null as HTMLImageElement | null,
@@ -1043,7 +1048,7 @@ function render(): void {
   ctx.restore();
 
   ctx.save();
-  ctx.strokeStyle = "#f8fafc";
+  ctx.strokeStyle = cropColors.outline;
   ctx.lineWidth = 2;
   ctx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
   drawHandles(cropRect);
@@ -1054,7 +1059,7 @@ function drawHandles(cropRect: Rect): void {
   const half = HANDLE_SIZE / 2;
   const points = handlePoints(cropRect);
 
-  ctx.fillStyle = "#0f766e";
+  ctx.fillStyle = cropColors.handle;
   for (const point of Object.values(points)) {
     ctx.fillRect(point.x - half, point.y - half, HANDLE_SIZE, HANDLE_SIZE);
   }

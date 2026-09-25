@@ -1,15 +1,34 @@
 :root {
   color-scheme: light;
   font-family: "SF Pro Text", "Segoe UI", sans-serif;
-  --bg: #f4f3ef;
-  --panel: #fcfbf8;
-  --border: #d6d1c8;
-  --hover: #eceae4;
-  --text: #2a2621;
-  --muted: #6a645d;
-  --accent: #6a7447;
-  --accent-strong: #545d39;
-  --danger: #b93f2f;
+  /* Background */
+  --app-bg: #F6F8F8;
+  --surface-bg: #FBFCFC;
+  --canvas-bg: #FFFFFF;
+
+  /* Borders */
+  --border-subtle: #E1E5E5;
+  --border: #CDD3D3;
+  --border-strong: #AEB8B8;
+
+  /* Text */
+  --text-primary: #243131;
+  --text-secondary: #667272;
+  --text-disabled: #A7AFAF;
+
+  /* Accent */
+  --accent: #168C82;
+  --accent-hover: #117A72;
+  --accent-active: #0D6D66;
+  --accent-soft: #E4F3F1;
+
+  /* Controls */
+  --control-bg: #FFFFFF;
+  --control-hover: #F0F3F3;
+  --control-active: #E6EAEA;
+
+  /* Semantic */
+  --danger: #C94F4F;
 }
 
 * {
@@ -21,8 +40,8 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--app-bg);
+  color: var(--text-primary);
 }
 
 body {
@@ -44,7 +63,7 @@ body {
   column-gap: 20px;
   row-gap: 10px;
   padding: 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .toolbar-group {
@@ -62,8 +81,8 @@ button,
 select,
 input {
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
+  background: var(--control-bg);
+  color: var(--text-primary);
   border-radius: 5px;
   height: 36px;
   padding: 0 12px;
@@ -74,35 +93,37 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+select:disabled,
+input:disabled {
+  color: var(--text-disabled);
   cursor: not-allowed;
-  opacity: 0.5;
 }
 
 button:hover:not(:disabled) {
   border-color: var(--accent);
-  background: var(--hover);
+  background: var(--control-hover);
 }
 
 #save-button {
   background: var(--accent);
-  color: #f9f7f1;
+  color: var(--control-bg);
   border-color: var(--accent);
 }
 
 #save-button:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: var(--accent-hover);
 }
 
 #open-button {
-  color: var(--muted);
-  background: var(--panel);
+  color: var(--text-secondary);
+  background: var(--control-bg);
 }
 
 #open-button:hover:not(:disabled),
 #add-ratio-button:hover:not(:disabled) {
-  color: var(--accent-strong);
-  background: var(--hover);
+  color: var(--accent-hover);
+  background: var(--control-hover);
 }
 
 .icon-button {
@@ -129,12 +150,12 @@ button:hover:not(:disabled) {
   border-radius: 5px;
   border-color: transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 #add-ratio-button:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--hover);
+  background: var(--control-hover);
 }
 
 .orientation-toggle {
@@ -149,8 +170,8 @@ button:hover:not(:disabled) {
   padding: 0;
   height: auto;
   min-height: 0;
-  border: 1.6px solid #b2aba0;
-  background: var(--panel);
+  border: 1.6px solid var(--border-strong);
+  background: var(--control-bg);
   border-radius: 2px;
   transition: background-color 120ms ease, border-color 120ms ease;
 }
@@ -161,7 +182,7 @@ button:hover:not(:disabled) {
 }
 
 .orientation-choice:disabled:hover {
-  border-color: #b2aba0;
+  border-color: var(--border-strong);
 }
 
 .orientation-choice.landscape {
@@ -181,22 +202,22 @@ button:hover:not(:disabled) {
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .orientation-choice.is-active,
 .orientation-choice.is-active:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--accent) 82%, var(--panel));
+  background: var(--accent);
   border-color: var(--accent);
 }
 
 .orientation-choice.is-active .orientation-label {
-  color: #f9f7f1;
+  color: var(--control-bg);
 }
 
 .orientation-toggle[data-active-orientation="square"] .orientation-choice {
-  background: color-mix(in oklab, var(--accent) 26%, var(--panel));
-  border-color: color-mix(in oklab, var(--accent) 54%, #b2aba0);
+  background: var(--accent-soft);
+  border-color: var(--border-strong);
 }
 
 .ratio-group {
@@ -226,7 +247,7 @@ button:hover:not(:disabled) {
   height: 100%;
   border-radius: 2px;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--canvas-bg);
   overflow: hidden;
 }
 
@@ -266,7 +287,7 @@ button:hover:not(:disabled) {
   justify-content: flex-end;
   gap: 10px;
   padding: 8px 10px;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -287,7 +308,7 @@ button:hover:not(:disabled) {
 }
 
 .zoom-controls.is-disabled {
-  opacity: 0.5;
+  color: var(--text-disabled);
 }
 
 .zoom-controls input:disabled {
@@ -303,7 +324,7 @@ button:hover:not(:disabled) {
   max-width: min(420px, calc(100% - 32px));
   padding: 10px 14px;
   text-align: center;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 13px;
   pointer-events: none;
 }
@@ -317,10 +338,10 @@ button:hover:not(:disabled) {
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
   padding: 8px 10px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 #status-text.error {
@@ -353,7 +374,7 @@ button:hover:not(:disabled) {
   inset: 0;
   display: grid;
   place-items: center;
-  background: color-mix(in oklab, #37312a 30%, transparent);
+  background: color-mix(in oklab, var(--text-primary) 30%, transparent);
   z-index: 200;
 }
 
@@ -366,10 +387,10 @@ button:hover:not(:disabled) {
   max-height: 85vh;
   display: grid;
   grid-template-rows: auto 1fr;
-  background: var(--panel);
+  background: var(--surface-bg);
   border-radius: 4px;
   overflow: hidden;
-  border: 1px solid #b2aba0;
+  border: 1px solid var(--border-strong);
 }
 
 .modal-header {
@@ -377,7 +398,7 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   align-items: center;
   padding: 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .modal-header h2 {
@@ -386,7 +407,7 @@ button:hover:not(:disabled) {
 }
 
 .preview-body {
-  background: var(--bg);
+  background: var(--canvas-bg);
 }
 
 .preview-modal-content {
@@ -395,7 +416,7 @@ button:hover:not(:disabled) {
 }
 
 .preview-modal-content .zoom-controls {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .ratio-modal-content {
@@ -415,7 +436,7 @@ button:hover:not(:disabled) {
   margin: 0;
   padding: 12px 0 0;
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .save-folder-settings legend {
@@ -455,7 +476,7 @@ button:hover:not(:disabled) {
 
 .save-folder-settings:not(:disabled) .custom-save-folder-row.is-disabled,
 .save-folder-settings:disabled {
-  opacity: 0.5;
+  color: var(--text-disabled);
 }
 
 .custom-save-folder-row button:disabled {
@@ -469,14 +490,14 @@ button:hover:not(:disabled) {
 
 .language-field {
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-field {
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .settings-field select {
@@ -485,7 +506,7 @@ button:hover:not(:disabled) {
 
 .settings-field-help {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -494,12 +515,12 @@ button:hover:not(:disabled) {
   display: grid;
   gap: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .ratio-form-copy {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -514,7 +535,7 @@ button:hover:not(:disabled) {
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .ratio-form input {
@@ -546,14 +567,14 @@ button:hover:not(:disabled) {
 }
 
 .danger-button {
-  color: #f9f7f1;
+  color: var(--control-bg);
   background: var(--danger);
   border-color: var(--danger);
 }
 
 .danger-button:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--danger) 70%, #7c231d);
-  background: color-mix(in oklab, var(--danger) 82%, #7c231d);
+  border-color: color-mix(in oklab, var(--danger) 70%, var(--text-primary));
+  background: color-mix(in oklab, var(--danger) 82%, var(--text-primary));
 }
 
 .hidden {
@@ -564,7 +585,7 @@ button:hover:not(:disabled) {
   display: grid;
   gap: 10px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .custom-ratio-header {
@@ -580,7 +601,7 @@ button:hover:not(:disabled) {
 .custom-ratio-header p,
 .custom-ratio-empty {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -603,7 +624,7 @@ button:hover:not(:disabled) {
 
 .custom-ratio-item.is-selected {
   border-color: var(--accent);
-  background: color-mix(in oklab, var(--panel) 86%, #e3e3da);
+  background: var(--accent-soft);
 }
 
 .custom-ratio-actions {
@@ -620,6 +641,39 @@ button:hover:not(:disabled) {
   position: absolute;
   max-width: none;
   display: block;
+}
+
+button:active:not(:disabled),
+#open-button:active:not(:disabled),
+#add-ratio-button:active:not(:disabled) {
+  background: var(--control-active);
+}
+
+#save-button:active:not(:disabled),
+.orientation-choice.is-active:active:not(:disabled) {
+  background: var(--accent-active);
+}
+
+.danger-button:active:not(:disabled) {
+  background: color-mix(in oklab, var(--danger) 70%, var(--text-primary));
+}
+
+#save-button:disabled {
+  background: var(--control-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-disabled);
+}
+
+.orientation-choice:disabled .orientation-label,
+.save-folder-settings:disabled .settings-field-help {
+  color: var(--text-disabled);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 760px) {
