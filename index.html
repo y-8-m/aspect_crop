@@ -10,7 +10,7 @@
     <div id="app">
       <header class="toolbar">
         <div class="toolbar-group toolbar-group-open">
-          <button id="open-button" class="icon-button" type="button" aria-label="Open image files" title="Open image files">
+          <button id="open-button" class="icon-button" type="button" data-i18n-aria-label="open" data-i18n-title="open">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5z"
@@ -40,15 +40,15 @@
 
         <div class="toolbar-group toolbar-group-aspect">
           <div class="ratio-group">
-            <select id="ratio-select" aria-label="Aspect ratio"></select>
+            <select id="ratio-select" data-i18n-aria-label="aspectRatio"></select>
           </div>
-          <div id="orientation-toggle" class="orientation-toggle" role="group" aria-label="Aspect orientation">
+          <div id="orientation-toggle" class="orientation-toggle" role="group" data-i18n-aria-label="orientation">
             <button
               id="landscape-orientation-button"
               class="orientation-choice landscape"
               type="button"
-              aria-label="Use landscape orientation"
-              title="Use landscape orientation"
+              data-i18n-aria-label="landscape"
+              data-i18n-title="landscape"
             >
               <span id="landscape-ratio-label" class="orientation-label"></span>
             </button>
@@ -56,15 +56,15 @@
               id="portrait-orientation-button"
               class="orientation-choice portrait"
               type="button"
-              aria-label="Use portrait orientation"
-              title="Use portrait orientation"
+              data-i18n-aria-label="portrait"
+              data-i18n-title="portrait"
             >
               <span id="portrait-ratio-label" class="orientation-label"></span>
             </button>
           </div>
         </div>
 
-        <div class="toolbar-group toolbar-group-size" aria-label="Crop size in pixels">
+        <div class="toolbar-group toolbar-group-size" data-i18n-aria-label="cropSize">
           <input
             id="crop-width-input"
             class="crop-dimension-input"
@@ -72,9 +72,9 @@
             min="1"
             step="1"
             inputmode="numeric"
-            aria-label="Crop width in pixels"
-            title="Crop width in pixels"
-            placeholder="W"
+            data-i18n-aria-label="cropWidth"
+            data-i18n-title="cropWidth"
+            data-i18n-placeholder="widthPlaceholder"
             disabled
           />
           <span class="crop-dimension-separator" aria-hidden="true">×</span>
@@ -85,17 +85,17 @@
             min="1"
             step="1"
             inputmode="numeric"
-            aria-label="Crop height in pixels"
-            title="Crop height in pixels"
-            placeholder="H"
+            data-i18n-aria-label="cropHeight"
+            data-i18n-title="cropHeight"
+            data-i18n-placeholder="heightPlaceholder"
             disabled
           />
           <span class="crop-dimension-unit">px</span>
         </div>
 
         <div class="toolbar-group toolbar-group-actions">
-          <button id="preview-button" type="button" disabled>Preview</button>
-          <button id="save-button" class="icon-button" type="button" disabled aria-label="Save cropped image" title="Save cropped image">
+          <button id="preview-button" type="button" disabled data-i18n="preview"></button>
+          <button id="save-button" class="icon-button" type="button" disabled data-i18n-aria-label="save" data-i18n-title="save">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 20v-6h8v6"
@@ -111,8 +111,8 @@
             id="add-ratio-button"
             class="icon-button"
             type="button"
-            aria-label="Settings"
-            title="Settings"
+            data-i18n-aria-label="settings"
+            data-i18n-title="settings"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -130,40 +130,40 @@
 
       <main class="workspace">
         <section class="canvas-panel" id="drop-zone">
-          <div id="editor-viewport" class="zoom-viewport" tabindex="0" aria-label="Crop image viewport">
+          <div id="editor-viewport" class="zoom-viewport" tabindex="0" data-i18n-aria-label="editorViewport">
             <div id="editor-surface" class="zoom-surface">
               <canvas id="editor-canvas"></canvas>
             </div>
           </div>
-          <p class="drop-hint" id="drop-hint">Drop images here or use Open.</p>
+          <p class="drop-hint" id="drop-hint" data-i18n="dropHint"></p>
         </section>
-        <div id="editor-zoom-controls" class="zoom-controls" role="group" aria-label="Crop display zoom">
-          <label for="editor-zoom">Zoom</label>
+        <div id="editor-zoom-controls" class="zoom-controls" role="group" data-i18n-aria-label="editorZoom">
+          <label for="editor-zoom" data-i18n="zoom"></label>
           <input id="editor-zoom" type="range" min="0" max="100" value="100" disabled />
           <output id="editor-zoom-value" for="editor-zoom">100%</output>
         </div>
       </main>
 
       <footer class="status-row">
-        <span id="status-text">Ready.</span>
-        <span id="image-size">Image: -</span>
-        <span id="crop-size">Crop: -</span>
+        <span id="status-text"></span>
+        <span id="image-size"></span>
+        <span id="crop-size"></span>
       </footer>
     </div>
 
-    <div id="preview-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div id="preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title">
       <div class="modal-content preview-modal-content">
         <header class="modal-header">
-          <h2>Crop Preview</h2>
-          <button id="close-preview" type="button">Close</button>
+          <h2 id="preview-modal-title" data-i18n="cropPreview"></h2>
+          <button id="close-preview" type="button" data-i18n="close"></button>
         </header>
-        <div id="preview-viewport" class="preview-body zoom-viewport" tabindex="0" aria-label="Preview image viewport">
+        <div id="preview-viewport" class="preview-body zoom-viewport" tabindex="0" data-i18n-aria-label="previewViewport">
           <div id="preview-surface" class="zoom-surface">
-            <img id="preview-image" alt="Crop preview" />
+            <img id="preview-image" data-i18n-alt="cropPreview" />
           </div>
         </div>
-        <div id="preview-zoom-controls" class="zoom-controls" role="group" aria-label="Preview display zoom">
-          <label for="preview-zoom">Zoom</label>
+        <div id="preview-zoom-controls" class="zoom-controls" role="group" data-i18n-aria-label="previewZoom">
+          <label for="preview-zoom" data-i18n="zoom"></label>
           <input id="preview-zoom" type="range" min="0" max="100" value="100" disabled />
           <output id="preview-zoom-value" for="preview-zoom">100%</output>
         </div>
@@ -173,64 +173,69 @@
     <div id="ratio-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ratio-modal-title">
       <div class="modal-content ratio-modal-content">
         <header class="modal-header">
-          <h2 id="ratio-modal-title">Settings</h2>
-          <button id="close-ratio-modal" type="button">Close</button>
+          <h2 id="ratio-modal-title" data-i18n="settings"></h2>
+          <button id="close-ratio-modal" type="button" data-i18n="close"></button>
         </header>
         <div class="ratio-modal-body">
+          <label class="settings-field language-field" for="language-select">
+            <span data-i18n="language"></span>
+            <select id="language-select" data-i18n-aria-label="language">
+              <option value="ja" lang="ja" data-i18n="japanese"></option>
+              <option value="en" lang="en" data-i18n="english"></option>
+            </select>
+          </label>
           <section class="settings-section" aria-labelledby="export-format-title">
             <div class="custom-ratio-header">
-              <h3 id="export-format-title">Export</h3>
-              <p>Choose how cropped images should be saved.</p>
+              <h3 id="export-format-title" data-i18n="export"></h3>
+              <p data-i18n="exportDescription"></p>
             </div>
             <label class="settings-field" for="output-format-select">
-              Export Format
-              <select id="output-format-select" aria-label="Export format">
-                <option value="same">Same as Original</option>
+              <span data-i18n="exportFormat"></span>
+              <select id="output-format-select" data-i18n-aria-label="exportFormat">
+                <option value="same" data-i18n="sameAsOriginal"></option>
                 <option value="png">PNG</option>
                 <option value="jpeg">JPEG</option>
                 <option value="webp">WebP</option>
                 <option value="bmp">BMP</option>
               </select>
             </label>
-            <p class="settings-field-help">
-              PNG and BMP stay lossless. WebP is saved losslessly. JPEG uses the highest quality.
-            </p>
+            <p class="settings-field-help" data-i18n="exportHelp"></p>
           </section>
           <fieldset id="save-folder-settings" class="save-folder-settings">
-            <legend>保存ダイアログの初期フォルダ</legend>
-            <label><input type="radio" name="save-folder-mode" value="source" checked />元画像と同じフォルダ</label>
-            <label><input type="radio" name="save-folder-mode" value="last" />前回保存したフォルダ</label>
-            <label><input type="radio" name="save-folder-mode" value="custom" />指定したフォルダ</label>
+            <legend data-i18n="saveFolder"></legend>
+            <label><input type="radio" name="save-folder-mode" value="source" checked /><span data-i18n="sourceFolder"></span></label>
+            <label><input type="radio" name="save-folder-mode" value="last" /><span data-i18n="lastFolder"></span></label>
+            <label><input type="radio" name="save-folder-mode" value="custom" /><span data-i18n="customFolder"></span></label>
             <div id="custom-save-folder-row" class="custom-save-folder-row">
-              <input id="custom-save-folder" type="text" readonly disabled aria-label="指定フォルダのパス" placeholder="フォルダ未指定" />
-              <button id="change-save-folder" type="button" disabled>変更</button>
+              <input id="custom-save-folder" type="text" readonly disabled data-i18n-aria-label="folderPath" data-i18n-placeholder="noFolder" />
+              <button id="change-save-folder" type="button" disabled data-i18n="change"></button>
             </div>
             <p id="save-folder-help" class="settings-field-help" aria-live="polite"></p>
           </fieldset>
           <form id="ratio-form" class="ratio-form">
-            <p class="ratio-form-copy">Create a custom fixed aspect ratio. It will be saved for the next launch too.</p>
+            <p class="ratio-form-copy" data-i18n="ratioFormHelp"></p>
             <div class="ratio-form-grid">
               <label for="ratio-width-input">
-                Width
+                <span data-i18n="width"></span>
                 <input id="ratio-width-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
               </label>
               <label for="ratio-height-input">
-                Height
+                <span data-i18n="height"></span>
                 <input id="ratio-height-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
               </label>
             </div>
             <p id="ratio-form-error" class="ratio-form-error hidden" aria-live="polite"></p>
             <div class="ratio-form-actions">
-              <button id="save-ratio-button" type="submit">Add Ratio</button>
+              <button id="save-ratio-button" type="submit" data-i18n="addRatio"></button>
             </div>
           </form>
           <section class="custom-ratio-section" aria-labelledby="custom-ratio-title">
             <div class="custom-ratio-header">
-              <h3 id="custom-ratio-title">Custom Ratios</h3>
-              <p>Pick a saved ratio, move it, or delete it.</p>
+              <h3 id="custom-ratio-title" data-i18n="customRatios"></h3>
+              <p data-i18n="customRatiosHelp"></p>
             </div>
             <div id="custom-ratio-list" class="custom-ratio-list"></div>
-            <p id="custom-ratio-empty" class="custom-ratio-empty hidden">No custom ratios yet.</p>
+            <p id="custom-ratio-empty" class="custom-ratio-empty hidden" data-i18n="noCustomRatios"></p>
           </section>
         </div>
       </div>

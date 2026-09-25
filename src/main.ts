@@ -31,10 +31,39 @@ import {
   resolveOutputFormatChoice
 } from "./outputFormat";
 import { createRuntimeBridge, type SaveResult } from "./runtimeBridge";
-import { loadOutputFormatChoice, persistOutputFormatChoice, loadSaveFolderSettings, persistSaveFolderMode, persistCustomSaveFolder, recordSuccessfulSave } from "./settingsStore";
+import {
+  loadOutputFormatChoice,
+  persistOutputFormatChoice,
+  loadSaveFolderSettings,
+  persistSaveFolderMode,
+  persistCustomSaveFolder,
+  recordSuccessfulSave,
+  loadLanguage,
+  persistLanguage,
+  LANGUAGE_STORAGE_KEY
+} from "./settingsStore";
 import { parseSaveFolderMode, resolveSaveFolder } from "./saveFolder";
 import { createZoomViewport } from "./zoomViewport";
 import { sourceToView } from "./zoomGeometry";
+import {
+  applyTranslations,
+  detectLanguage,
+  getLanguage,
+  setLanguage,
+  onLanguageChange,
+  msg,
+  t,
+  translate,
+  LocalizedError,
+  errorMessage,
+  type Message
+} from "./i18n";
+
+setLanguage(detectLanguage(loadLanguage(), navigator.languages?.length ? navigator.languages : [navigator.language]));
+applyTranslations(document);
+let currentStatus: Message = msg("ready");
+let currentRatioError: Message | null = null;
+let currentFolderError: Message | null = null;
 
 const HANDLE_SIZE = 12;
 const MULTI_IMAGE_CONFIRM_THRESHOLD = 10;
@@ -93,6 +122,7 @@ const previewImage = must<HTMLImageElement>("#preview-image");
 const closePreview = must<HTMLButtonElement>("#close-preview");
 const ratioModal = must<HTMLDivElement>("#ratio-modal");
 const closeRatioModal = must<HTMLButtonElement>("#close-ratio-modal");
+const languageSelect = must<HTMLSelectElement>("#language-select");
 const outputFormatSelect = must<HTMLSelectElement>("#output-format-select");
 const saveFolderSettings = must<HTMLFieldSetElement>("#save-folder-settings");
 const customSaveFolder = must<HTMLInputElement>("#custom-save-folder");
@@ -167,6 +197,7 @@ const modalController = createModalController({
   ratioInitialFocus: outputFormatSelect,
   prepareRatioModal: () => {
     syncOutputFormatSelect();
+    currentFolderError = null;
     syncSaveFolderSettings();
     setRatioFormValues(currentAspectDimensions());
     clearRatioFormError();
@@ -194,6 +225,8 @@ const fileDropController = createFileDropController({
   supportedUniquePaths
 });
 
+onLanguageChange(refreshLanguage);
+refreshLanguage();
 syncOutputFormatSelect();
 syncAspectUi();
 setupEvents();
@@ -202,16 +235,41 @@ resizeCanvas();
 render();
 void loadStartupImageIfAny();
 
+function refreshLanguage(): void {
+  applyTranslations(document);
+  languageSelect.value = getLanguage();
+  renderAspectOptions();
+  renderCustomAspectList();
+  syncSwapRatioButton(selectedAspectPreset());
+  updateMetaLabels();
+  statusText.textContent = translate(currentStatus);
+  if (currentRatioError) ratioFormError.textContent = translate(currentRatioError);
+  syncSaveFolderSettings();
+  editorZoom.translate();
+  previewZoom.translate();
+}
+
 function setupEvents(): void {
+  languageSelect.addEventListener("change", () => {
+    const language = languageSelect.value === "ja" ? "ja" : "en";
+    persistLanguage(language);
+    setLanguage(language);
+  });
+  window.addEventListener("storage", (event) => {
+    if (event.key === LANGUAGE_STORAGE_KEY) {
+      setLanguage(detectLanguage(loadLanguage(), navigator.languages?.length ? navigator.languages : [navigator.language]));
+    }
+  });
   saveFolderSettings.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.name !== "save-folder-mode") return;
+    currentFolderError = null;
     persistSaveFolderMode(parseSaveFolderMode(input.value));
     syncSaveFolderSettings();
   });
   changeSaveFolder.addEventListener("click", async () => {
     changeSaveFolder.disabled = true;
-    let errorMessage = "";
+    currentFolderError = null;
     try {
       const settings = loadSaveFolderSettings();
       const initial = await resolveSaveFolder({ ...settings, mode: "custom" },
@@ -220,13 +278,12 @@ function setupEvents(): void {
       const selected = await runtime.openFolderDialog(initial);
       if (selected) {
         if (await runtime.isSaveFolderAvailable(selected)) persistCustomSaveFolder(selected);
-        else errorMessage = "このフォルダは利用できません。別のフォルダを選択してください。";
+        else currentFolderError = msg("folderUnavailable");
       }
     } catch (error) {
-      errorMessage = asMessage(error);
+      currentFolderError = asMessage(error);
     } finally {
       syncSaveFolderSettings();
-      if (errorMessage) saveFolderHelp.textContent = errorMessage;
     }
   });
   openButton.addEventListener("click", () => {
@@ -249,11 +306,11 @@ function setupEvents(): void {
       await loadImageFromFile(file);
       if (files.length > 1) {
         setStatus(
-          `Loaded ${state.imageName}. Additional files were ignored outside the desktop runtime.`,
+          msg("loadedWeb", { name: state.imageName }),
           true
         );
       } else {
-        setStatus(`Loaded ${state.imageName}.`);
+        setStatus(msg("loaded", { name: state.imageName }));
       }
     } catch (error) {
       setStatus(asMessage(error), true);
@@ -380,7 +437,7 @@ async function loadStartupImageIfAny(): Promise<void> {
     }
 
     await loadImageFromPath(startupPath);
-    setStatus(`Loaded ${state.imageName} from startup file.`);
+    setStatus(msg("loadedStartup", { name: state.imageName }));
   } catch (error) {
     setStatus(asMessage(error), true);
   }
@@ -401,16 +458,16 @@ async function openImagesFromDialog(): Promise<void> {
 
 async function openPathBatch(rawPaths: string[], source: PathBatchSource): Promise<void> {
   if (!isTauriRuntime) {
-    throw new Error("Opening image paths requires the desktop app runtime.");
+    throw new LocalizedError("desktopPaths");
   }
 
   const paths = supportedUniquePaths(rawPaths);
   if (paths.length === 0) {
-    throw new Error("No supported image files were found.");
+    throw new LocalizedError("noSupportedImages");
   }
 
   if (!confirmLargeImageBatch(paths.length, source)) {
-    setStatus("Opening was cancelled.");
+    setStatus(msg("openingCancelled"));
     return;
   }
 
@@ -445,12 +502,12 @@ async function submitCustomAspectRatio(): Promise<void> {
   const height = parseIntegerInput(ratioHeightInput.value);
 
   if (!width || !height) {
-    setRatioFormError("Use whole numbers greater than 0.");
+    setRatioFormError(msg("positiveIntegers"));
     return;
   }
 
   if (width > MAX_ASPECT_INPUT || height > MAX_ASPECT_INPUT) {
-    setRatioFormError(`Values up to ${MAX_ASPECT_INPUT} are supported.`);
+    setRatioFormError(msg("maxRatioValue", { max: MAX_ASPECT_INPUT }));
     return;
   }
 
@@ -459,8 +516,8 @@ async function submitCustomAspectRatio(): Promise<void> {
   modalController.closeRatio();
   setStatus(
     ensuredPreset.created
-      ? `Added custom aspect ratio ${ensuredPreset.preset.label}.`
-      : `${ensuredPreset.preset.label} is already available, so it was selected.`
+      ? msg("ratioAdded", { ratio: ensuredPreset.preset.label })
+      : msg("ratioAlreadyExists", { ratio: ensuredPreset.preset.label })
   );
 }
 
@@ -471,11 +528,11 @@ function deleteCustomAspectPreset(presetId: string): void {
   }
 
   if (preset.builtIn) {
-    setRatioFormError("Built-in aspect ratios cannot be deleted.");
+    setRatioFormError(msg("builtInDelete"));
     return;
   }
 
-  const confirmed = window.confirm(`Delete custom aspect ratio ${preset.label}?`);
+  const confirmed = window.confirm(t("confirmDeleteRatio", { ratio: preset.label }));
   if (!confirmed) {
     return;
   }
@@ -490,13 +547,13 @@ function deleteCustomAspectPreset(presetId: string): void {
   state.isAspectSwapped = false;
   syncAspectChange();
   setRatioFormValues(selectedAspectPreset());
-  setStatus(`Deleted custom aspect ratio ${preset.label}.`);
+  setStatus(msg("ratioDeleted", { ratio: preset.label }));
 }
 
 function setAspectOrientation(targetOrientation: "landscape" | "portrait"): void {
   const preset = selectedAspectPreset();
   if (preset.width === preset.height) {
-    setStatus(`${preset.label} stays the same when width and height are swapped.`);
+    setStatus(msg("ratioUnchanged", { ratio: preset.label }));
     return;
   }
 
@@ -504,7 +561,7 @@ function setAspectOrientation(targetOrientation: "landscape" | "portrait"): void
   syncAspectChange();
 
   const activeRatio = currentAspectDimensions();
-  setStatus(`Using ${activeRatio.width}:${activeRatio.height}.`);
+  setStatus(msg("usingRatio", { ratio: `${activeRatio.width}:${activeRatio.height}` }));
 }
 
 function moveCustomAspectPreset(presetId: string, direction: -1 | 1): void {
@@ -514,7 +571,7 @@ function moveCustomAspectPreset(presetId: string, direction: -1 | 1): void {
   }
 
   if (preset.builtIn) {
-    setRatioFormError("Built-in aspect ratios stay in the default order.");
+    setRatioFormError(msg("builtInOrder"));
     return;
   }
 
@@ -535,8 +592,7 @@ function moveCustomAspectPreset(presetId: string, direction: -1 | 1): void {
   syncAspectUi();
   setRatioFormValues(selectedAspectPreset());
 
-  const directionLabel = direction < 0 ? "up" : "down";
-  setStatus(`Moved custom aspect ratio ${preset.label} ${directionLabel}.`);
+  setStatus(msg(direction < 0 ? "ratioMovedUp" : "ratioMovedDown", { ratio: preset.label }));
 }
 
 function renderAspectOptions(): void {
@@ -545,8 +601,8 @@ function renderAspectOptions(): void {
   const builtInPresets = state.aspectPresets.filter((preset) => preset.builtIn);
   const customPresets = state.aspectPresets.filter((preset) => !preset.builtIn);
 
-  appendPresetGroup(ratioSelect, "Default", builtInPresets);
-  appendPresetGroup(ratioSelect, "Custom", customPresets);
+  appendPresetGroup(ratioSelect, t("default"), builtInPresets);
+  appendPresetGroup(ratioSelect, t("custom"), customPresets);
 
   const selectedPreset = selectedAspectPreset();
   ratioSelect.title = "";
@@ -610,19 +666,19 @@ function syncSwapRatioButton(preset: AspectPreset): void {
   portraitOrientationButton.disabled = isSquare;
 
   landscapeOrientationButton.title = isSquare
-    ? "Width and height are already the same."
-    : `Use ${landscapeRatioLabel.textContent}`;
+    ? t("squareDimensions")
+    : t("useRatio", { ratio: landscapeRatioLabel.textContent ?? "" });
   portraitOrientationButton.title = isSquare
-    ? "Width and height are already the same."
-    : `Use ${portraitRatioLabel.textContent}`;
+    ? t("squareDimensions")
+    : t("useRatio", { ratio: portraitRatioLabel.textContent ?? "" });
 
   landscapeOrientationButton.setAttribute(
     "aria-label",
-    isSquare ? `Aspect ratio ${preset.label} is square.` : `Use ${landscapeRatioLabel.textContent}`
+    isSquare ? t("squareRatio", { ratio: preset.label }) : t("useRatio", { ratio: landscapeRatioLabel.textContent ?? "" })
   );
   portraitOrientationButton.setAttribute(
     "aria-label",
-    isSquare ? `Aspect ratio ${preset.label} is square.` : `Use ${portraitRatioLabel.textContent}`
+    isSquare ? t("squareRatio", { ratio: preset.label }) : t("useRatio", { ratio: portraitRatioLabel.textContent ?? "" })
   );
 }
 
@@ -663,7 +719,8 @@ function renderCustomAspectList(): void {
     upButton.type = "button";
     upButton.className = "secondary-button";
     upButton.textContent = "↑";
-    upButton.title = `Move ${preset.label} up`;
+    upButton.title = t("moveRatioUp", { ratio: preset.label });
+    upButton.setAttribute("aria-label", upButton.title);
     upButton.dataset.action = "move-up";
     upButton.dataset.presetId = preset.id;
     upButton.disabled = index === 0;
@@ -672,7 +729,8 @@ function renderCustomAspectList(): void {
     downButton.type = "button";
     downButton.className = "secondary-button";
     downButton.textContent = "↓";
-    downButton.title = `Move ${preset.label} down`;
+    downButton.title = t("moveRatioDown", { ratio: preset.label });
+    downButton.setAttribute("aria-label", downButton.title);
     downButton.dataset.action = "move-down";
     downButton.dataset.presetId = preset.id;
     downButton.disabled = index === presets.length - 1;
@@ -680,7 +738,9 @@ function renderCustomAspectList(): void {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "danger-button";
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = t("delete");
+    deleteButton.title = t("deleteRatio", { ratio: preset.label });
+    deleteButton.setAttribute("aria-label", deleteButton.title);
     deleteButton.dataset.action = "delete";
     deleteButton.dataset.presetId = preset.id;
 
@@ -723,7 +783,7 @@ async function loadImageFromFile(file: File): Promise<void> {
 
 async function loadImageFromPath(path: string): Promise<void> {
   if (!isTauriRuntime) {
-    throw new Error("Loading image paths requires the desktop app runtime.");
+    throw new LocalizedError("desktopPaths");
   }
 
   ensureSupportedPath(path);
@@ -765,7 +825,7 @@ async function decodeImage(bytes: Uint8Array): Promise<HTMLImageElement> {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const element = new Image();
       element.onload = () => resolve(element);
-      element.onerror = () => reject(new Error("Unsupported or broken image file."));
+      element.onerror = () => reject(new LocalizedError("brokenImage"));
       element.src = url;
     });
 
@@ -1100,15 +1160,15 @@ function resetCropToLargest(): void {
 
 function updateMetaLabels(): void {
   if (!state.image || !state.crop) {
-    imageSizeText.textContent = "Image: -";
-    cropSizeText.textContent = "Crop: -";
+    imageSizeText.textContent = t("imageSize", { size: "-" });
+    cropSizeText.textContent = t("cropDimensions", { size: "-" });
     syncCropDimensionInputs();
     return;
   }
 
   const roundedCrop = roundedOutputCrop();
-  imageSizeText.textContent = `Image: ${state.image.naturalWidth} x ${state.image.naturalHeight}`;
-  cropSizeText.textContent = `Crop: ${roundedCrop.width} x ${roundedCrop.height}`;
+  imageSizeText.textContent = t("imageSize", { size: `${state.image.naturalWidth} x ${state.image.naturalHeight}` });
+  cropSizeText.textContent = t("cropDimensions", { size: `${roundedCrop.width} x ${roundedCrop.height}` });
   syncCropDimensionInputs(roundedCrop);
 }
 
@@ -1143,7 +1203,7 @@ function clearPreview(): void {
 
 function renderCroppedCanvas(): HTMLCanvasElement {
   if (!state.image || !state.crop) {
-    throw new Error("No image loaded.");
+    throw new LocalizedError("noImage");
   }
 
   const crop = roundedOutputCrop();
@@ -1153,7 +1213,7 @@ function renderCroppedCanvas(): HTMLCanvasElement {
 
   const bufferContext = buffer.getContext("2d");
   if (!bufferContext) {
-    throw new Error("2D context unavailable for export.");
+    throw new LocalizedError("canvasUnavailable");
   }
 
   bufferContext.drawImage(
@@ -1173,7 +1233,7 @@ function renderCroppedCanvas(): HTMLCanvasElement {
 
 async function makeImageBytes(format: OutputFormat): Promise<Uint8Array> {
   if (!isBrowserEncodedFormat(format)) {
-    throw new Error(`${outputFormatLabel(format)} export requires the desktop app runtime.`);
+    throw new LocalizedError("desktopExport", { format: outputFormatLabel(format) });
   }
 
   const buffer = renderCroppedCanvas();
@@ -1182,12 +1242,12 @@ async function makeImageBytes(format: OutputFormat): Promise<Uint8Array> {
   const blob = await new Promise<Blob>((resolve, reject) => {
     buffer.toBlob((result) => {
       if (!result) {
-        reject(new Error(`Failed to create ${outputFormatLabel(format)} image.`));
+        reject(new LocalizedError("createImageFailed", { format: outputFormatLabel(format) }));
         return;
       }
 
       if (result.type !== options.mimeType) {
-        reject(new Error(`${outputFormatLabel(format)} export is unavailable in this runtime.`));
+        reject(new LocalizedError("exportUnavailable", { format: outputFormatLabel(format) }));
         return;
       }
 
@@ -1303,8 +1363,9 @@ function syncCropDimensionInputs(roundedCrop?: Rect): void {
   isSyncingCropDimensionInputs = false;
 }
 
-function setStatus(message: string, isError = false): void {
-  statusText.textContent = message;
+function setStatus(message: Message, isError = false): void {
+  currentStatus = message;
+  statusText.textContent = translate(message);
   statusText.classList.toggle("error", isError);
 }
 
@@ -1319,7 +1380,7 @@ function must<T extends Element>(selector: string): T {
 function get2dContext(target: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = target.getContext("2d");
   if (!context) {
-    throw new Error("2D context not available.");
+    throw new LocalizedError("canvasUnavailable");
   }
   return context;
 }
@@ -1670,12 +1731,12 @@ async function saveCroppedImage(): Promise<void> {
 function applySaveResult(result: SaveResult): void {
   recordSuccessfulSave(result);
   if (result.kind === "saved") {
-    setStatus(`Saved: ${result.location}`);
+    setStatus(msg("saved", { path: result.location }));
     return;
   }
 
   if (result.kind === "downloaded") {
-    setStatus(`Downloaded ${result.location}.`);
+    setStatus(msg("downloaded", { path: result.location }));
   }
 }
 
@@ -1687,13 +1748,11 @@ function syncSaveFolderSettings(): void {
   }
   const disabled = !isTauriRuntime || settings.mode !== "custom";
   customSaveFolder.value = settings.customFolder ?? "";
-  customSaveFolder.title = settings.customFolder ?? "フォルダ未指定";
+  customSaveFolder.title = settings.customFolder ?? t("noFolder");
   customSaveFolder.disabled = disabled;
   changeSaveFolder.disabled = disabled;
   must<HTMLElement>("#custom-save-folder-row").classList.toggle("is-disabled", disabled);
-  saveFolderHelp.textContent = isTauriRuntime
-    ? "保存ダイアログで別のフォルダへ変更することもできます。"
-    : "この設定はデスクトップ版で利用できます。ブラウザ版の保存先はブラウザの設定に従います。";
+  saveFolderHelp.textContent = currentFolderError ? translate(currentFolderError) : t(isTauriRuntime ? "folderHelp" : "folderWebHelp");
 }
 
 function isAspectPresetRecord(value: unknown): value is Partial<AspectPreset> {
@@ -1730,12 +1789,14 @@ function greatestCommonDivisor(left: number, right: number): number {
   return Math.max(1, a);
 }
 
-function setRatioFormError(message: string): void {
-  ratioFormError.textContent = message;
+function setRatioFormError(message: Message): void {
+  currentRatioError = message;
+  ratioFormError.textContent = translate(message);
   ratioFormError.classList.remove("hidden");
 }
 
 function clearRatioFormError(): void {
+  currentRatioError = null;
   ratioFormError.textContent = "";
   ratioFormError.classList.add("hidden");
 }
@@ -1746,14 +1807,14 @@ function ensureSupportedFileInput(file: File): void {
   const extensionOk = extension ? SUPPORTED_IMAGE_EXTENSIONS.has(extension) : false;
 
   if (!mimeOk || !extensionOk) {
-    throw new Error("Unsupported file format. Use PNG/JPEG/WEBP/GIF/BMP.");
+    throw new LocalizedError("unsupportedFormat");
   }
 }
 
 function ensureSupportedPath(path: string): void {
   const extension = imageExtension(path);
   if (!extension || !SUPPORTED_IMAGE_EXTENSIONS.has(extension)) {
-    throw new Error("Unsupported file format. Use PNG/JPEG/WEBP/GIF/BMP.");
+    throw new LocalizedError("unsupportedFormat");
   }
 }
 
@@ -1785,12 +1846,8 @@ function buildDefaultFileName(originalName: string, format: OutputFormat): strin
   return `${base}_crop.${preferredOutputExtension(format)}`;
 }
 
-function asMessage(value: unknown): string {
-  if (value instanceof Error) {
-    return value.message;
-  }
-
-  return typeof value === "string" ? value : "Unknown error.";
+function asMessage(value: unknown): Message {
+  return errorMessage(value);
 }
 
 function supportedUniquePaths(paths: string[]): string[] {
@@ -1822,10 +1879,7 @@ function confirmLargeImageBatch(count: number, source: PathBatchSource): boolean
     return true;
   }
 
-  const action = source === "drop" ? "drop" : "open";
-  return window.confirm(
-    `${count} images will be loaded. Each image opens in its own window. Continue with this ${action}?`
-  );
+  return window.confirm(t(source === "drop" ? "confirmDropBatch" : "confirmOpenBatch", { count }));
 }
 
 function shouldReuseCurrentWindow(pathCount: number): boolean {
@@ -1837,21 +1891,20 @@ function buildBatchStatusMessage(
   extraWindowCount: number,
   source: PathBatchSource,
   reusedCurrentWindow: boolean
-): string {
+): Message {
   if (currentPath && extraWindowCount === 0) {
-    return `Loaded ${fileNameFromPath(currentPath)}.`;
+    return msg("loaded", { name: fileNameFromPath(currentPath) });
   }
 
   if (currentPath) {
-    return `Loaded ${fileNameFromPath(currentPath)}. Opened ${extraWindowCount} additional window(s).`;
+    return msg("loadedWindows", { name: fileNameFromPath(currentPath), count: extraWindowCount });
   }
 
-  const action = source === "drop" ? "drop" : "selection";
   if (!reusedCurrentWindow) {
-    return `Opened ${extraWindowCount} new window(s) from the ${action}. Current window was left as-is.`;
+    return msg(source === "drop" ? "openedDropWindows" : "openedSelectionWindows", { count: extraWindowCount });
   }
 
-  return `Opened ${extraWindowCount} new window(s).`;
+  return msg("openedWindows", { count: extraWindowCount });
 }
 
 function normalizePath(path: string): string {

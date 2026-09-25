@@ -2,6 +2,18 @@ import type { OutputFormatChoice } from "./appTypes";
 import { parseOutputFormatChoice } from "./outputFormat";
 import { parseSaveFolderMode, parentFolder, type SaveFolderMode, type SaveFolderSettings } from "./saveFolder";
 import type { SaveResult } from "./runtimeBridge";
+import type { Language } from "./messages";
+
+export const LANGUAGE_STORAGE_KEY = "aspect-crop.language";
+
+export function loadLanguage(): Language | null {
+  const value = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return value === "ja" || value === "en" ? value : null;
+}
+
+export function persistLanguage(language: Language): void {
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+}
 
 const OUTPUT_FORMAT_STORAGE_KEY = "aspect-crop.output-format";
 const SAVE_FOLDER_MODE_KEY = "aspect-crop.save-folder-mode";

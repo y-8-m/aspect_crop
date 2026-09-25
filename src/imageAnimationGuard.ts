@@ -1,14 +1,16 @@
+import { LocalizedError } from "./i18n";
+
 export function ensureNonAnimatedImage(bytes: Uint8Array, extension: string | null): void {
   if (extension === "png" && isAnimatedPng(bytes)) {
-    throw new Error("Animated PNG (APNG) files are not supported.");
+    throw new LocalizedError("animatedImage", { format: "PNG (APNG)" });
   }
 
   if (extension === "gif" && isAnimatedGif(bytes)) {
-    throw new Error("Animated GIF files are not supported.");
+    throw new LocalizedError("animatedImage", { format: "GIF" });
   }
 
   if (extension === "webp" && isAnimatedWebP(bytes)) {
-    throw new Error("Animated WebP files are not supported.");
+    throw new LocalizedError("animatedImage", { format: "WebP" });
   }
 }
 

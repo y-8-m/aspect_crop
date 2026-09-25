@@ -1,15 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import ts from "typescript";
+import { compile, dataUrl } from "./loadTs.mjs";
 
-const dataUrl = (source) => `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-async function compile(name, imports = {}) {
-  const source = await readFile(new URL(`../src/${name}.ts`, import.meta.url), "utf8");
-  let js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
-  for (const [specifier, url] of Object.entries(imports)) js = js.replaceAll(`"${specifier}"`, JSON.stringify(url));
-  return dataUrl(js);
-}
 const folderUrl = await compile("saveFolder");
 const formatUrl = await compile("outputFormat");
 const storeUrl = await compile("settingsStore", { "./saveFolder": folderUrl, "./outputFormat": formatUrl });

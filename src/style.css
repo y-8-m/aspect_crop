@@ -467,6 +467,11 @@ button:hover:not(:disabled) {
   gap: 10px;
 }
 
+.language-field {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
 .settings-field {
   display: grid;
   gap: 6px;
