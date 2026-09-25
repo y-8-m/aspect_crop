@@ -11,7 +11,6 @@ import type {
   WindowBounds
 } from "./appTypes";
 import {
-  fitRect,
   largestCropRect,
   minCropSize,
   moveCrop,
@@ -32,7 +31,10 @@ import {
   resolveOutputFormatChoice
 } from "./outputFormat";
 import { createRuntimeBridge, type SaveResult } from "./runtimeBridge";
-import { loadOutputFormatChoice, persistOutputFormatChoice } from "./settingsStore";
+import { loadOutputFormatChoice, persistOutputFormatChoice, loadSaveFolderSettings, persistSaveFolderMode, persistCustomSaveFolder, recordSuccessfulSave } from "./settingsStore";
+import { parseSaveFolderMode, resolveSaveFolder } from "./saveFolder";
+import { createZoomViewport } from "./zoomViewport";
+import { sourceToView } from "./zoomGeometry";
 
 const HANDLE_SIZE = 12;
 const MULTI_IMAGE_CONFIRM_THRESHOLD = 10;
@@ -92,6 +94,10 @@ const closePreview = must<HTMLButtonElement>("#close-preview");
 const ratioModal = must<HTMLDivElement>("#ratio-modal");
 const closeRatioModal = must<HTMLButtonElement>("#close-ratio-modal");
 const outputFormatSelect = must<HTMLSelectElement>("#output-format-select");
+const saveFolderSettings = must<HTMLFieldSetElement>("#save-folder-settings");
+const customSaveFolder = must<HTMLInputElement>("#custom-save-folder");
+const changeSaveFolder = must<HTMLButtonElement>("#change-save-folder");
+const saveFolderHelp = must<HTMLParagraphElement>("#save-folder-help");
 const ratioForm = must<HTMLFormElement>("#ratio-form");
 const ratioWidthInput = must<HTMLInputElement>("#ratio-width-input");
 const ratioHeightInput = must<HTMLInputElement>("#ratio-height-input");
@@ -116,6 +122,42 @@ const state = {
   previewUrl: null as string | null
 };
 
+const editorZoom = createZoomViewport({
+  viewport: must<HTMLElement>("#editor-viewport"),
+  surface: must<HTMLElement>("#editor-surface"),
+  controls: must<HTMLElement>("#editor-zoom-controls"),
+  slider: must<HTMLInputElement>("#editor-zoom"),
+  output: must<HTMLOutputElement>("#editor-zoom-value"),
+  onChange: (image, width, height) => {
+    state.imageRect = state.image ? image : null;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    if (state.drag) {
+      if (canvas.hasPointerCapture(state.drag.pointerId)) canvas.releasePointerCapture(state.drag.pointerId);
+      state.drag = null;
+    }
+    resizeCanvas();
+  }
+});
+
+const previewViewport = must<HTMLElement>("#preview-viewport");
+const previewZoom = createZoomViewport({
+  viewport: previewViewport,
+  surface: must<HTMLElement>("#preview-surface"),
+  controls: must<HTMLElement>("#preview-zoom-controls"),
+  slider: must<HTMLInputElement>("#preview-zoom"),
+  output: must<HTMLOutputElement>("#preview-zoom-value"),
+  onChange: (image) => {
+    previewImage.style.width = `${image.width}px`;
+    previewImage.style.height = `${image.height}px`;
+    previewImage.style.left = `${image.x + previewViewport.scrollLeft}px`;
+    previewImage.style.top = `${image.y + previewViewport.scrollTop}px`;
+  }
+});
+previewImage.addEventListener("load", () => {
+  previewZoom.setImage(previewImage.naturalWidth, previewImage.naturalHeight);
+});
+
 const modalController = createModalController({
   previewModal,
   previewImage,
@@ -125,6 +167,7 @@ const modalController = createModalController({
   ratioInitialFocus: outputFormatSelect,
   prepareRatioModal: () => {
     syncOutputFormatSelect();
+    syncSaveFolderSettings();
     setRatioFormValues(currentAspectDimensions());
     clearRatioFormError();
     renderCustomAspectList();
@@ -160,6 +203,32 @@ render();
 void loadStartupImageIfAny();
 
 function setupEvents(): void {
+  saveFolderSettings.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== "save-folder-mode") return;
+    persistSaveFolderMode(parseSaveFolderMode(input.value));
+    syncSaveFolderSettings();
+  });
+  changeSaveFolder.addEventListener("click", async () => {
+    changeSaveFolder.disabled = true;
+    let errorMessage = "";
+    try {
+      const settings = loadSaveFolderSettings();
+      const initial = await resolveSaveFolder({ ...settings, mode: "custom" },
+        state.imageSource?.kind === "path" ? state.imageSource.path : null,
+        (path) => runtime.isSaveFolderAvailable(path));
+      const selected = await runtime.openFolderDialog(initial);
+      if (selected) {
+        if (await runtime.isSaveFolderAvailable(selected)) persistCustomSaveFolder(selected);
+        else errorMessage = "このフォルダは利用できません。別のフォルダを選択してください。";
+      }
+    } catch (error) {
+      errorMessage = asMessage(error);
+    } finally {
+      syncSaveFolderSettings();
+      if (errorMessage) saveFolderHelp.textContent = errorMessage;
+    }
+  });
   openButton.addEventListener("click", () => {
     if (isTauriRuntime) {
       void openImagesFromDialog();
@@ -683,7 +752,8 @@ function updateAfterLoad(): void {
   previewButton.disabled = false;
   saveButton.disabled = false;
   dropHint.classList.add("hidden");
-  resizeCanvas();
+  editorZoom.setImage(state.image!.naturalWidth, state.image!.naturalHeight, true);
+  previewZoom.setImage(0, 0, true);
   updateMetaLabels();
 }
 
@@ -807,6 +877,8 @@ function onKeyDown(event: KeyboardEvent): void {
     return;
   }
 
+  if (modalController.isPreviewOpen() || modalController.isRatioOpen()) return;
+
   if (!state.image || !state.crop) {
     return;
   }
@@ -871,8 +943,10 @@ function resizeCanvas(): void {
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
 
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   render();
@@ -889,8 +963,8 @@ function render(): void {
     return;
   }
 
-  const imageRect = fitRect(state.image.naturalWidth, state.image.naturalHeight, width, height);
-  state.imageRect = imageRect;
+  const imageRect = state.imageRect;
+  if (!imageRect) return;
 
   ctx.drawImage(state.image, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
 
@@ -1007,12 +1081,7 @@ function imageRectToCanvasRect(rect: Rect): Rect {
 
   const scale = state.imageRect.width / state.image.naturalWidth;
 
-  return {
-    x: state.imageRect.x + rect.x * scale,
-    y: state.imageRect.y + rect.y * scale,
-    width: rect.width * scale,
-    height: rect.height * scale
-  };
+  return sourceToView(rect, state.imageRect, scale);
 }
 
 function resetCropToLargest(): void {
@@ -1566,31 +1635,40 @@ async function saveCroppedImage(): Promise<void> {
   const outputFormat = resolvedOutputFormat();
   const defaultName = buildDefaultFileName(state.imageName || "cropped", outputFormat);
   const crop = roundedOutputCrop();
+  const source = state.imageSource;
+  const initialFolder = isTauriRuntime ? await resolveSaveFolder(
+    loadSaveFolderSettings(),
+    source?.kind === "path" ? source.path : null,
+    (path) => runtime.isSaveFolderAvailable(path)
+  ) : undefined;
   let result: SaveResult;
 
-  if (isTauriRuntime && state.imageSource?.kind === "path") {
+  if (isTauriRuntime && source?.kind === "path") {
     result = await runtime.saveCroppedImageFromPath(
-      state.imageSource.path,
+      source.path,
       defaultName,
       crop,
-      outputFormat
+      outputFormat,
+      initialFolder
     );
-  } else if (isTauriRuntime && state.imageSource?.kind === "memory") {
+  } else if (isTauriRuntime && source?.kind === "memory") {
     result = await runtime.saveCroppedImageFromBytes(
-      state.imageSource.bytes,
+      source.bytes,
       defaultName,
       crop,
-      outputFormat
+      outputFormat,
+      initialFolder
     );
   } else {
     const bytes = await makeImageBytes(outputFormat);
-    result = await runtime.saveImage(defaultName, bytes, outputFormat);
+    result = await runtime.saveImage(defaultName, bytes, outputFormat, initialFolder);
   }
 
   applySaveResult(result);
 }
 
 function applySaveResult(result: SaveResult): void {
+  recordSuccessfulSave(result);
   if (result.kind === "saved") {
     setStatus(`Saved: ${result.location}`);
     return;
@@ -1599,6 +1677,23 @@ function applySaveResult(result: SaveResult): void {
   if (result.kind === "downloaded") {
     setStatus(`Downloaded ${result.location}.`);
   }
+}
+
+function syncSaveFolderSettings(): void {
+  const settings = loadSaveFolderSettings();
+  saveFolderSettings.disabled = !isTauriRuntime;
+  for (const input of saveFolderSettings.querySelectorAll<HTMLInputElement>('input[name="save-folder-mode"]')) {
+    input.checked = input.value === settings.mode;
+  }
+  const disabled = !isTauriRuntime || settings.mode !== "custom";
+  customSaveFolder.value = settings.customFolder ?? "";
+  customSaveFolder.title = settings.customFolder ?? "フォルダ未指定";
+  customSaveFolder.disabled = disabled;
+  changeSaveFolder.disabled = disabled;
+  must<HTMLElement>("#custom-save-folder-row").classList.toggle("is-disabled", disabled);
+  saveFolderHelp.textContent = isTauriRuntime
+    ? "保存ダイアログで別のフォルダへ変更することもできます。"
+    : "この設定はデスクトップ版で利用できます。ブラウザ版の保存先はブラウザの設定に従います。";
 }
 
 function isAspectPresetRecord(value: unknown): value is Partial<AspectPreset> {

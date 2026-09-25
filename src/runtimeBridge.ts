@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/tauri";
+import { saveDefaultPath } from "./saveFolder";
 
 import type { OutputCrop, OutputFormat, WindowBounds } from "./appTypes";
 import {
@@ -28,18 +29,22 @@ export type RuntimeBridge = {
   readImageBytes(path: string): Promise<Uint8Array>;
   openImageWindows(paths: string[], templateBounds: WindowBounds | null): Promise<void>;
   takeStartupPath(): Promise<string | null>;
-  saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat): Promise<SaveResult>;
+  openFolderDialog(defaultPath?: string): Promise<string | null>;
+  isSaveFolderAvailable(path: string): Promise<boolean>;
+  saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat, initialFolder?: string): Promise<SaveResult>;
   saveCroppedImageFromPath(
     sourcePath: string,
     defaultName: string,
     crop: OutputCrop,
-    format: OutputFormat
+    format: OutputFormat,
+    initialFolder?: string
   ): Promise<SaveResult>;
   saveCroppedImageFromBytes(
     sourceBytes: Uint8Array,
     defaultName: string,
     crop: OutputCrop,
-    format: OutputFormat
+    format: OutputFormat,
+    initialFolder?: string
   ): Promise<SaveResult>;
   restoreWindowBounds(bounds: WindowBounds): Promise<void>;
   onWindowBoundsChanged(listener: () => void): Promise<void>;
@@ -88,9 +93,17 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       const windowLabel = await this.getWindowLabel();
       return invoke<string | null>("take_window_file_path", { windowLabel });
     },
-    async saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat): Promise<SaveResult> {
+    async openFolderDialog(defaultPath?: string): Promise<string | null> {
+      const { open } = await getTauriDialogApi();
+      const selection = await open({ directory: true, multiple: false, defaultPath, title: "保存ダイアログの初期フォルダ" });
+      return typeof selection === "string" ? selection : null;
+    },
+    async isSaveFolderAvailable(path: string): Promise<boolean> {
+      return invoke<boolean>("is_save_folder_available", { path });
+    },
+    async saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat, initialFolder?: string): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
-      const savePath = await save(saveDialogOptions(defaultName, format));
+      const savePath = await save(saveDialogOptions(defaultName, format, initialFolder));
 
       if (!savePath) {
         return { kind: "cancelled" };
@@ -109,10 +122,11 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       sourcePath: string,
       defaultName: string,
       crop: OutputCrop,
-      format: OutputFormat
+      format: OutputFormat,
+      initialFolder?: string
     ): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
-      const savePath = await save(saveDialogOptions(defaultName, format));
+      const savePath = await save(saveDialogOptions(defaultName, format, initialFolder));
 
       if (!savePath) {
         return { kind: "cancelled" };
@@ -133,10 +147,11 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       sourceBytes: Uint8Array,
       defaultName: string,
       crop: OutputCrop,
-      format: OutputFormat
+      format: OutputFormat,
+      initialFolder?: string
     ): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
-      const savePath = await save(saveDialogOptions(defaultName, format));
+      const savePath = await save(saveDialogOptions(defaultName, format, initialFolder));
 
       if (!savePath) {
         return { kind: "cancelled" };
@@ -201,6 +216,8 @@ function createTauriRuntimeBridge(): RuntimeBridge {
 function createWebRuntimeBridge(): RuntimeBridge {
   return {
     kind: "web",
+    async openFolderDialog(): Promise<null> { return null; },
+    async isSaveFolderAvailable(): Promise<boolean> { return false; },
     async getWindowLabel(): Promise<string> {
       return "main";
     },
@@ -266,12 +283,12 @@ function downloadBytes(fileName: string, bytes: Uint8Array, mimeType: string): v
   }, 0);
 }
 
-function saveDialogOptions(defaultName: string, format: OutputFormat): {
+function saveDialogOptions(defaultName: string, format: OutputFormat, initialFolder?: string): {
   defaultPath: string;
   filters: { name: string; extensions: string[] }[];
 } {
   return {
-    defaultPath: defaultName,
+    defaultPath: saveDefaultPath(defaultName, initialFolder),
     filters: [
       {
         name: outputFormatLabel(format),

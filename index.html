@@ -116,7 +116,7 @@
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
-                d="M4 7h11M4 17h16M15 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM9 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
+                d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"
@@ -130,9 +130,18 @@
 
       <main class="workspace">
         <section class="canvas-panel" id="drop-zone">
-          <canvas id="editor-canvas"></canvas>
+          <div id="editor-viewport" class="zoom-viewport" tabindex="0" aria-label="Crop image viewport">
+            <div id="editor-surface" class="zoom-surface">
+              <canvas id="editor-canvas"></canvas>
+            </div>
+          </div>
           <p class="drop-hint" id="drop-hint">Drop images here or use Open.</p>
         </section>
+        <div id="editor-zoom-controls" class="zoom-controls" role="group" aria-label="Crop display zoom">
+          <label for="editor-zoom">Zoom</label>
+          <input id="editor-zoom" type="range" min="0" max="100" value="100" disabled />
+          <output id="editor-zoom-value" for="editor-zoom">100%</output>
+        </div>
       </main>
 
       <footer class="status-row">
@@ -143,13 +152,20 @@
     </div>
 
     <div id="preview-modal" class="modal hidden" role="dialog" aria-modal="true">
-      <div class="modal-content">
+      <div class="modal-content preview-modal-content">
         <header class="modal-header">
           <h2>Crop Preview</h2>
           <button id="close-preview" type="button">Close</button>
         </header>
-        <div class="preview-body">
-          <img id="preview-image" alt="Crop preview" />
+        <div id="preview-viewport" class="preview-body zoom-viewport" tabindex="0" aria-label="Preview image viewport">
+          <div id="preview-surface" class="zoom-surface">
+            <img id="preview-image" alt="Crop preview" />
+          </div>
+        </div>
+        <div id="preview-zoom-controls" class="zoom-controls" role="group" aria-label="Preview display zoom">
+          <label for="preview-zoom">Zoom</label>
+          <input id="preview-zoom" type="range" min="0" max="100" value="100" disabled />
+          <output id="preview-zoom-value" for="preview-zoom">100%</output>
         </div>
       </div>
     </div>
@@ -180,6 +196,17 @@
               PNG and BMP stay lossless. WebP is saved losslessly. JPEG uses the highest quality.
             </p>
           </section>
+          <fieldset id="save-folder-settings" class="save-folder-settings">
+            <legend>保存ダイアログの初期フォルダ</legend>
+            <label><input type="radio" name="save-folder-mode" value="source" checked />元画像と同じフォルダ</label>
+            <label><input type="radio" name="save-folder-mode" value="last" />前回保存したフォルダ</label>
+            <label><input type="radio" name="save-folder-mode" value="custom" />指定したフォルダ</label>
+            <div id="custom-save-folder-row" class="custom-save-folder-row">
+              <input id="custom-save-folder" type="text" readonly disabled aria-label="指定フォルダのパス" placeholder="フォルダ未指定" />
+              <button id="change-save-folder" type="button" disabled>変更</button>
+            </div>
+            <p id="save-folder-help" class="settings-field-help" aria-live="polite"></p>
+          </fieldset>
           <form id="ratio-form" class="ratio-form">
             <p class="ratio-form-copy">Create a custom fixed aspect ratio. It will be saved for the next launch too.</p>
             <div class="ratio-form-grid">

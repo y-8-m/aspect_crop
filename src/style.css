@@ -4,6 +4,7 @@
   --bg: #f4f3ef;
   --panel: #fcfbf8;
   --border: #d6d1c8;
+  --hover: #eceae4;
   --text: #2a2621;
   --muted: #6a645d;
   --accent: #6a7447;
@@ -20,7 +21,7 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(150deg, #f7f5f1, #f1eee8 58%, #ebe7df);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -43,9 +44,7 @@ body {
   column-gap: 20px;
   row-gap: 10px;
   padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: color-mix(in oklab, var(--panel) 92%, #e6e1d8);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar-group {
@@ -65,7 +64,7 @@ input {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
-  border-radius: 8px;
+  border-radius: 5px;
   height: 36px;
   padding: 0 12px;
   font-size: 14px;
@@ -82,6 +81,7 @@ button:disabled {
 
 button:hover:not(:disabled) {
   border-color: var(--accent);
+  background: var(--hover);
 }
 
 #save-button {
@@ -94,8 +94,7 @@ button:hover:not(:disabled) {
   background: var(--accent-strong);
 }
 
-#open-button,
-#add-ratio-button {
+#open-button {
   color: var(--muted);
   background: var(--panel);
 }
@@ -103,6 +102,7 @@ button:hover:not(:disabled) {
 #open-button:hover:not(:disabled),
 #add-ratio-button:hover:not(:disabled) {
   color: var(--accent-strong);
+  background: var(--hover);
 }
 
 .icon-button {
@@ -118,10 +118,23 @@ button:hover:not(:disabled) {
   height: 18px;
 }
 
-#open-button svg,
-#add-ratio-button svg {
+#open-button svg {
   width: 20px;
   height: 20px;
+}
+
+#add-ratio-button {
+  width: 36px;
+  min-width: 36px;
+  border-radius: 5px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+#add-ratio-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--hover);
 }
 
 .orientation-toggle {
@@ -137,9 +150,9 @@ button:hover:not(:disabled) {
   height: auto;
   min-height: 0;
   border: 1.6px solid #b2aba0;
-  background: color-mix(in oklab, #ece8e0 78%, var(--panel));
+  background: var(--panel);
   border-radius: 2px;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .orientation-choice:disabled {
@@ -171,10 +184,10 @@ button:hover:not(:disabled) {
   color: var(--muted);
 }
 
-.orientation-choice.is-active {
+.orientation-choice.is-active,
+.orientation-choice.is-active:hover:not(:disabled) {
   background: color-mix(in oklab, var(--accent) 82%, var(--panel));
   border-color: var(--accent);
-  transform: translateY(-1px);
 }
 
 .orientation-choice.is-active .orientation-label {
@@ -204,27 +217,81 @@ button:hover:not(:disabled) {
 
 .workspace {
   min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .canvas-panel {
   position: relative;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 2px;
   border: 1px solid var(--border);
-  background: radial-gradient(circle at 15% 15%, #efebe4, #f5f2ec 34%, var(--panel) 90%);
+  background: var(--panel);
   overflow: hidden;
 }
 
 .canvas-panel.drag-active {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 #editor-canvas {
-  width: 100%;
-  height: 100%;
+  position: sticky;
+  top: 0;
+  left: 0;
   display: block;
   touch-action: none;
+}
+
+.zoom-viewport {
+  min-width: 0;
+  min-height: 0;
+  overflow: scroll;
+  overscroll-behavior: contain;
+}
+
+#editor-viewport {
+  width: 100%;
+  height: 100%;
+}
+
+.zoom-surface {
+  position: relative;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.zoom-controls input[type="range"] {
+  width: 150px;
+  min-width: 0;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  accent-color: var(--accent);
+  background: transparent;
+}
+
+.zoom-controls output {
+  min-width: 7ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-controls.is-disabled {
+  opacity: 0.5;
+}
+
+.zoom-controls input:disabled {
+  opacity: 1;
 }
 
 .drop-hint {
@@ -238,9 +305,6 @@ button:hover:not(:disabled) {
   text-align: center;
   color: var(--muted);
   font-size: 13px;
-  border-radius: 8px;
-  border: 1px dashed var(--border);
-  background: color-mix(in oklab, var(--panel) 95%, #ebe5dc);
   pointer-events: none;
 }
 
@@ -253,9 +317,7 @@ button:hover:not(:disabled) {
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  border-top: 1px solid var(--border);
   padding: 8px 10px;
   font-size: 13px;
   color: var(--muted);
@@ -305,7 +367,7 @@ button:hover:not(:disabled) {
   display: grid;
   grid-template-rows: auto 1fr;
   background: var(--panel);
-  border-radius: 12px;
+  border-radius: 4px;
   overflow: hidden;
   border: 1px solid #b2aba0;
 }
@@ -324,8 +386,16 @@ button:hover:not(:disabled) {
 }
 
 .preview-body {
-  overflow: auto;
-  padding: 10px;
+  background: var(--bg);
+}
+
+.preview-modal-content {
+  height: 85vh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.preview-modal-content .zoom-controls {
+  border-top: 1px solid var(--border);
 }
 
 .ratio-modal-content {
@@ -336,6 +406,60 @@ button:hover:not(:disabled) {
   display: grid;
   gap: 12px;
   padding: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.save-folder-settings {
+  min-width: 0;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.save-folder-settings legend {
+  padding: 0 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.save-folder-settings > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.save-folder-settings input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.custom-save-folder-row {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px 22px;
+}
+
+.custom-save-folder-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.save-folder-settings:not(:disabled) .custom-save-folder-row.is-disabled,
+.save-folder-settings:disabled {
+  opacity: 0.5;
+}
+
+.custom-save-folder-row button:disabled {
+  opacity: 1;
 }
 
 .settings-section {
@@ -364,6 +488,8 @@ button:hover:not(:disabled) {
 .ratio-form {
   display: grid;
   gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .ratio-form-copy {
@@ -407,13 +533,11 @@ button:hover:not(:disabled) {
 }
 
 #save-ratio-button {
-  background: color-mix(in oklab, var(--panel) 88%, #e5e6db);
   border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
 }
 
 .secondary-button {
-  background: color-mix(in oklab, var(--panel) 86%, #ede9e2);
-  border-color: color-mix(in oklab, var(--border) 80%, #b2aba0);
+  background: transparent;
 }
 
 .danger-button {
@@ -488,11 +612,9 @@ button:hover:not(:disabled) {
 }
 
 #preview-image {
-  max-width: 100%;
-  height: auto;
+  position: absolute;
+  max-width: none;
   display: block;
-  margin: 0 auto;
-  border: 1px solid var(--border);
 }
 
 @media (max-width: 760px) {

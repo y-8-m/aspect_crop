@@ -9,6 +9,12 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::Manager;
+mod save_folder;
+
+#[tauri::command]
+fn is_save_folder_available(path: String) -> bool {
+    save_folder::is_available(Path::new(&path))
+}
 
 struct AppState {
     startup_files: Mutex<HashMap<String, String>>,
@@ -245,6 +251,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             read_image_file,
+            is_save_folder_available,
             save_image_file,
             crop_image_to_file,
             crop_image_data_to_file,
