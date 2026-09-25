@@ -45,6 +45,7 @@ import {
 import { parseSaveFolderMode, resolveSaveFolder } from "./saveFolder";
 import { createZoomViewport } from "./zoomViewport";
 import { sourceToView } from "./zoomGeometry";
+import { createSettingsTabs } from "./settingsTabs";
 import {
   applyTranslations,
   detectLanguage,
@@ -122,8 +123,9 @@ const previewImage = must<HTMLImageElement>("#preview-image");
 const closePreview = must<HTMLButtonElement>("#close-preview");
 const ratioModal = must<HTMLDivElement>("#ratio-modal");
 const closeRatioModal = must<HTMLButtonElement>("#close-ratio-modal");
-const languageSelect = must<HTMLSelectElement>("#language-select");
-const outputFormatSelect = must<HTMLSelectElement>("#output-format-select");
+const languageSettings = must<HTMLDivElement>("#language-settings");
+const outputFormatSettings = must<HTMLFieldSetElement>("#output-format-settings");
+const settingsTabs = createSettingsTabs(ratioModal);
 const saveFolderSettings = must<HTMLFieldSetElement>("#save-folder-settings");
 const customSaveFolder = must<HTMLInputElement>("#custom-save-folder");
 const changeSaveFolder = must<HTMLButtonElement>("#change-save-folder");
@@ -199,9 +201,10 @@ const modalController = createModalController({
   closePreviewButton: closePreview,
   ratioModal,
   closeRatioButton: closeRatioModal,
-  ratioInitialFocus: outputFormatSelect,
+  ratioInitialFocus: must<HTMLButtonElement>("#settings-general-tab"),
   prepareRatioModal: () => {
-    syncOutputFormatSelect();
+    settingsTabs.select("general");
+    syncOutputFormatRadios();
     currentFolderError = null;
     syncSaveFolderSettings();
     setRatioFormValues(currentAspectDimensions());
@@ -232,7 +235,7 @@ const fileDropController = createFileDropController({
 
 onLanguageChange(refreshLanguage);
 refreshLanguage();
-syncOutputFormatSelect();
+syncOutputFormatRadios();
 syncAspectUi();
 setupEvents();
 void setupWindowStatePersistence();
@@ -242,7 +245,9 @@ void loadStartupImageIfAny();
 
 function refreshLanguage(): void {
   applyTranslations(document);
-  languageSelect.value = getLanguage();
+  for (const input of languageSettings.querySelectorAll<HTMLInputElement>('input[name="language"]')) {
+    input.checked = input.value === getLanguage();
+  }
   renderAspectOptions();
   renderCustomAspectList();
   syncSwapRatioButton(selectedAspectPreset());
@@ -255,8 +260,10 @@ function refreshLanguage(): void {
 }
 
 function setupEvents(): void {
-  languageSelect.addEventListener("change", () => {
-    const language = languageSelect.value === "ja" ? "ja" : "en";
+  languageSettings.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== "language" || !input.checked) return;
+    const language = input.value === "ja" ? "ja" : "en";
     persistLanguage(language);
     setLanguage(language);
   });
@@ -328,10 +335,12 @@ function setupEvents(): void {
     applyAspectPreset(ratioSelect.value);
   });
 
-  outputFormatSelect.addEventListener("change", () => {
-    const choice = parseOutputFormatChoice(outputFormatSelect.value);
+  outputFormatSettings.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== "output-format" || !input.checked) return;
+    const choice = parseOutputFormatChoice(input.value);
     if (!choice) {
-      syncOutputFormatSelect();
+      syncOutputFormatRadios();
       return;
     }
 
@@ -1757,7 +1766,9 @@ function syncSaveFolderSettings(): void {
   customSaveFolder.disabled = disabled;
   changeSaveFolder.disabled = disabled;
   must<HTMLElement>("#custom-save-folder-row").classList.toggle("is-disabled", disabled);
-  saveFolderHelp.textContent = currentFolderError ? translate(currentFolderError) : t(isTauriRuntime ? "folderHelp" : "folderWebHelp");
+  saveFolderHelp.textContent = currentFolderError ? translate(currentFolderError) : "";
+  saveFolderHelp.classList.toggle("hidden", !currentFolderError);
+  saveFolderSettings.title = isTauriRuntime ? "" : t("folderWebHelp");
 }
 
 function isAspectPresetRecord(value: unknown): value is Partial<AspectPreset> {
@@ -1837,8 +1848,10 @@ function fileNameFromPath(path: string): string {
   return parts[parts.length - 1] || "image";
 }
 
-function syncOutputFormatSelect(): void {
-  outputFormatSelect.value = state.outputFormatChoice;
+function syncOutputFormatRadios(): void {
+  for (const input of outputFormatSettings.querySelectorAll<HTMLInputElement>('input[name="output-format"]')) {
+    input.checked = input.value === state.outputFormatChoice;
+  }
 }
 
 function resolvedOutputFormat(): OutputFormat {

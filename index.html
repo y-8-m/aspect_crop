@@ -176,66 +176,66 @@
           <h2 id="ratio-modal-title" data-i18n="settings"></h2>
           <button id="close-ratio-modal" type="button" data-i18n="close"></button>
         </header>
+        <div class="settings-tabs" role="tablist" data-i18n-aria-label="settings">
+          <button id="settings-general-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-general-panel" data-settings-tab="general" data-i18n="generalSaveTab"></button>
+          <button id="settings-aspect-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-aspect-panel" tabindex="-1" data-settings-tab="aspect" data-i18n="aspectRatioTab"></button>
+        </div>
         <div class="ratio-modal-body">
-          <label class="settings-field language-field" for="language-select">
-            <span data-i18n="language"></span>
-            <select id="language-select" data-i18n-aria-label="language">
-              <option value="ja" lang="ja" data-i18n="japanese"></option>
-              <option value="en" lang="en" data-i18n="english"></option>
-            </select>
-          </label>
-          <section class="settings-section" aria-labelledby="export-format-title">
-            <div class="custom-ratio-header">
-              <h3 id="export-format-title" data-i18n="export"></h3>
-              <p data-i18n="exportDescription"></p>
-            </div>
-            <label class="settings-field" for="output-format-select">
-              <span data-i18n="exportFormat"></span>
-              <select id="output-format-select" data-i18n-aria-label="exportFormat">
-                <option value="same" data-i18n="sameAsOriginal"></option>
-                <option value="png">PNG</option>
-                <option value="jpeg">JPEG</option>
-                <option value="webp">WebP</option>
-                <option value="bmp">BMP</option>
-              </select>
-            </label>
-            <p class="settings-field-help" data-i18n="exportHelp"></p>
+          <section id="settings-general-panel" class="settings-tab-panel general-settings-panel" role="tabpanel" aria-labelledby="settings-general-tab">
+            <section class="language-field" aria-labelledby="language-settings-title">
+              <h3 id="language-settings-title" data-i18n="language"></h3>
+              <div id="language-settings" class="settings-radio-group" role="radiogroup" aria-labelledby="language-settings-title">
+                <label><input type="radio" name="language" value="ja" /><span lang="ja" data-i18n="japanese"></span></label>
+                <label><input type="radio" name="language" value="en" /><span lang="en" data-i18n="english"></span></label>
+              </div>
+            </section>
+            <section class="save-settings" aria-labelledby="save-settings-title">
+              <h3 id="save-settings-title" data-i18n="saveSection"></h3>
+              <fieldset id="output-format-settings" class="settings-radio-group">
+                <legend data-i18n="exportFormat"></legend>
+                <label><input type="radio" name="output-format" value="same" checked /><span data-i18n="sameAsOriginal"></span></label>
+                <label><input type="radio" name="output-format" value="png" /><span data-i18n="pngLossless"></span></label>
+                <label><input type="radio" name="output-format" value="jpeg" /><span data-i18n="jpegHighestQuality"></span></label>
+                <label><input type="radio" name="output-format" value="webp" /><span data-i18n="webpLossless"></span></label>
+                <label><input type="radio" name="output-format" value="bmp" /><span data-i18n="bmpLossless"></span></label>
+              </fieldset>
+              <fieldset id="save-folder-settings" class="settings-radio-group save-folder-settings">
+                <legend data-i18n="saveFolder"></legend>
+                <label><input type="radio" name="save-folder-mode" value="source" checked /><span data-i18n="sourceFolder"></span></label>
+                <label><input type="radio" name="save-folder-mode" value="last" /><span data-i18n="lastFolder"></span></label>
+                <label><input type="radio" name="save-folder-mode" value="custom" /><span data-i18n="customFolder"></span></label>
+                <div id="custom-save-folder-row" class="custom-save-folder-row">
+                  <input id="custom-save-folder" type="text" readonly disabled data-i18n-aria-label="folderPath" data-i18n-placeholder="noFolder" />
+                  <button id="change-save-folder" type="button" disabled data-i18n="change"></button>
+                </div>
+                <p id="save-folder-help" class="settings-field-help hidden" aria-live="polite"></p>
+              </fieldset>
+            </section>
           </section>
-          <fieldset id="save-folder-settings" class="save-folder-settings">
-            <legend data-i18n="saveFolder"></legend>
-            <label><input type="radio" name="save-folder-mode" value="source" checked /><span data-i18n="sourceFolder"></span></label>
-            <label><input type="radio" name="save-folder-mode" value="last" /><span data-i18n="lastFolder"></span></label>
-            <label><input type="radio" name="save-folder-mode" value="custom" /><span data-i18n="customFolder"></span></label>
-            <div id="custom-save-folder-row" class="custom-save-folder-row">
-              <input id="custom-save-folder" type="text" readonly disabled data-i18n-aria-label="folderPath" data-i18n-placeholder="noFolder" />
-              <button id="change-save-folder" type="button" disabled data-i18n="change"></button>
-            </div>
-            <p id="save-folder-help" class="settings-field-help" aria-live="polite"></p>
-          </fieldset>
-          <form id="ratio-form" class="ratio-form">
-            <p class="ratio-form-copy" data-i18n="ratioFormHelp"></p>
-            <div class="ratio-form-grid">
-              <label for="ratio-width-input">
-                <span data-i18n="width"></span>
-                <input id="ratio-width-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
-              </label>
-              <label for="ratio-height-input">
-                <span data-i18n="height"></span>
-                <input id="ratio-height-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
-              </label>
-            </div>
-            <p id="ratio-form-error" class="ratio-form-error hidden" aria-live="polite"></p>
-            <div class="ratio-form-actions">
-              <button id="save-ratio-button" type="submit" data-i18n="addRatio"></button>
-            </div>
-          </form>
-          <section class="custom-ratio-section" aria-labelledby="custom-ratio-title">
-            <div class="custom-ratio-header">
+          <section id="settings-aspect-panel" class="settings-tab-panel aspect-settings-panel" role="tabpanel" aria-labelledby="settings-aspect-tab" hidden>
+            <form id="ratio-form" class="ratio-form" aria-labelledby="add-ratio-title">
+              <h3 id="add-ratio-title" data-i18n="addCustomRatio"></h3>
+              <div class="ratio-form-grid">
+                <label for="ratio-width-input">
+                  <span data-i18n="width"></span>
+                  <input id="ratio-width-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
+                </label>
+                <span aria-hidden="true">:</span>
+                <label for="ratio-height-input">
+                  <span data-i18n="height"></span>
+                  <input id="ratio-height-input" type="number" min="1" max="999" step="1" inputmode="numeric" />
+                </label>
+                <button id="save-ratio-button" type="submit" data-i18n="addRatio"></button>
+              </div>
+              <p id="ratio-form-error" class="ratio-form-error hidden" aria-live="polite"></p>
+            </form>
+            <section class="custom-ratio-section" aria-labelledby="custom-ratio-title">
               <h3 id="custom-ratio-title" data-i18n="customRatios"></h3>
-              <p data-i18n="customRatiosHelp"></p>
-            </div>
-            <div id="custom-ratio-list" class="custom-ratio-list"></div>
-            <p id="custom-ratio-empty" class="custom-ratio-empty hidden" data-i18n="noCustomRatios"></p>
+              <div class="custom-ratio-scroll" tabindex="0" data-i18n-aria-label="customRatios">
+                <div id="custom-ratio-list" class="custom-ratio-list"></div>
+                <p id="custom-ratio-empty" class="custom-ratio-empty hidden" data-i18n="noCustomRatios"></p>
+              </div>
+            </section>
           </section>
         </div>
       </div>

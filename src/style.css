@@ -420,40 +420,94 @@ button:hover:not(:disabled) {
 }
 
 .ratio-modal-content {
-  width: min(90vw, 460px);
+  width: min(94vw, 520px);
+  height: min(600px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-.ratio-modal-body {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.save-folder-settings {
-  min-width: 0;
-  margin: 0;
-  padding: 12px 0 0;
-  border: 0;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.save-folder-settings legend {
-  padding: 0 8px 0 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.save-folder-settings > label {
+.settings-tabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  margin: 12px 14px 0;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--control-hover);
+}
+
+.settings-tabs [role="tab"] {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border-color: transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
-.save-folder-settings input[type="radio"] {
+.settings-tabs [aria-selected="true"] {
+  border-color: var(--border);
+  background: var(--control-bg);
+  color: var(--accent-active);
+}
+
+.ratio-modal-body {
+  min-height: 0;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.settings-tab-panel {
+  height: 100%;
+  min-height: 0;
+}
+
+.settings-tab-panel[hidden] {
+  display: none;
+}
+
+.general-settings-panel {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.save-settings {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.settings-tab-panel h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.settings-radio-group {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 0 0;
+  border: 0;
+}
+
+.settings-radio-group legend {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-radio-group > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.settings-radio-group input[type="radio"] {
   width: 14px;
   height: 14px;
   margin: 0;
@@ -483,11 +537,6 @@ button:hover:not(:disabled) {
   opacity: 1;
 }
 
-.settings-section {
-  display: grid;
-  gap: 10px;
-}
-
 .language-field {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
@@ -511,28 +560,27 @@ button:hover:not(:disabled) {
   line-height: 1.5;
 }
 
-.ratio-form {
+.aspect-settings-panel {
   display: grid;
-  gap: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
 }
 
-.ratio-form-copy {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+.ratio-form {
+  display: grid;
+  gap: 12px;
 }
 
 .ratio-form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
 }
 
 .ratio-form label {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 6px;
   font-size: 13px;
   color: var(--text-secondary);
@@ -540,6 +588,12 @@ button:hover:not(:disabled) {
 
 .ratio-form input {
   width: 100%;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.ratio-form label span {
+  flex-shrink: 0;
 }
 
 .ratio-form-error {
@@ -550,12 +604,6 @@ button:hover:not(:disabled) {
 
 .ratio-form-error.hidden {
   display: none;
-}
-
-.ratio-form-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 #save-ratio-button {
@@ -583,22 +631,20 @@ button:hover:not(:disabled) {
 
 .custom-ratio-section {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
-.custom-ratio-header {
-  display: grid;
-  gap: 4px;
+.custom-ratio-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
 }
 
-.custom-ratio-header h3 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.custom-ratio-header p,
 .custom-ratio-empty {
   margin: 0;
   color: var(--text-secondary);
@@ -607,6 +653,7 @@ button:hover:not(:disabled) {
 
 .custom-ratio-list {
   display: grid;
+  align-content: start;
   gap: 8px;
 }
 
@@ -692,18 +739,6 @@ input:focus-visible {
 
   #save-button {
     margin-left: 0;
-  }
-
-  .ratio-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .custom-ratio-row {
-    grid-template-columns: 1fr;
-  }
-
-  .custom-ratio-actions {
-    justify-content: flex-end;
   }
 
   .status-row {

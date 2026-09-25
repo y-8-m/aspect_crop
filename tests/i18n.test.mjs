@@ -49,7 +49,7 @@ test("messages and errors retranslate without changing their values", () => {
   assert.equal(translate(message), "<sample>{name}.png を読み込みました。");
   assert.equal(translate(errorMessage(error)), "999以下の値を入力してください。");
   assert.equal(t("dropHint"), "画像をドロップするか、「開く」から選択してください。");
-  assert.equal(t("exportHelp"), "PNG・BMP・WebPは可逆形式で保存します。JPEGは最高品質で保存します。");
+  assert.equal(t("pngLossless"), "PNG（可逆）");
   assert.equal(t("positiveIntegers"), "1以上の整数を入力してください。");
 });
 
