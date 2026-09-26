@@ -72,7 +72,7 @@ fn crop_image_to_file(
 ) -> Result<(), String> {
     let image =
         image::open(&source_path).map_err(|error| format!("Failed to open image: {error}"))?;
-    let cropped = crop_dynamic_image(&image, &crop);
+    let cropped = crop_dynamic_image(&image, &crop)?;
 
     save_dynamic_image(&cropped, &output_path, format)
 }
@@ -89,21 +89,103 @@ fn crop_image_data_to_file(
         .map_err(|error| format!("Failed to decode source image bytes: {error}"))?;
     let image = image::load_from_memory(&source_bytes)
         .map_err(|error| format!("Failed to decode source image: {error}"))?;
-    let cropped = crop_dynamic_image(&image, &crop);
+    let cropped = crop_dynamic_image(&image, &crop)?;
 
     save_dynamic_image(&cropped, &output_path, format)
 }
 
-fn crop_dynamic_image(image: &image::DynamicImage, crop: &CropRect) -> image::DynamicImage {
-    let image_width = image.width();
-    let image_height = image.height();
+fn validate_crop_rect(crop: &CropRect, image_width: u32, image_height: u32) -> Result<(), String> {
+    if crop.width == 0 || crop.height == 0 {
+        return Err("Invalid crop rectangle: width and height must be greater than zero.".into());
+    }
+    // Check the origin before subtracting, so neither subtraction nor addition can overflow.
+    if crop.x >= image_width || crop.y >= image_height {
+        return Err("Invalid crop rectangle: origin is outside image bounds.".into());
+    }
+    if crop.width > image_width - crop.x || crop.height > image_height - crop.y {
+        return Err("Invalid crop rectangle: crop exceeds image bounds.".into());
+    }
+    Ok(())
+}
 
-    let x = crop.x.min(image_width.saturating_sub(1));
-    let y = crop.y.min(image_height.saturating_sub(1));
-    let width = crop.width.clamp(1, image_width.saturating_sub(x));
-    let height = crop.height.clamp(1, image_height.saturating_sub(y));
+fn crop_dynamic_image(
+    image: &image::DynamicImage,
+    crop: &CropRect,
+) -> Result<image::DynamicImage, String> {
+    validate_crop_rect(crop, image.width(), image.height())?;
+    Ok(image.crop_imm(crop.x, crop.y, crop.width, crop.height))
+}
 
-    image.crop_imm(x, y, width, height)
+#[cfg(test)]
+mod crop_tests {
+    use super::*;
+
+    #[test]
+    fn validates_crop_rectangles() {
+        let cases = [
+            ("normal", (10, 20, 30, 40), (100, 80), true),
+            ("zero width", (0, 0, 0, 10), (100, 80), false),
+            ("zero height", (0, 0, 10, 0), (100, 80), false),
+            ("x outside", (100, 0, 1, 1), (100, 80), false),
+            ("y outside", (0, 80, 1, 1), (100, 80), false),
+            ("right overflow", (90, 0, 11, 1), (100, 80), false),
+            ("bottom overflow", (0, 70, 1, 11), (100, 80), false),
+            ("whole image", (0, 0, 100, 80), (100, 80), true),
+            ("last pixel", (99, 79, 1, 1), (100, 80), true),
+            ("empty image", (0, 0, 1, 1), (0, 0), false),
+            (
+                "x addition overflow",
+                (1, 0, u32::MAX, 1),
+                (u32::MAX, 80),
+                false,
+            ),
+            (
+                "y addition overflow",
+                (0, 1, 1, u32::MAX),
+                (100, u32::MAX),
+                false,
+            ),
+            (
+                "maximum dimensions",
+                (0, 0, u32::MAX, u32::MAX),
+                (u32::MAX, u32::MAX),
+                true,
+            ),
+        ];
+        for (name, (x, y, width, height), (image_width, image_height), valid) in cases {
+            let crop = CropRect {
+                x,
+                y,
+                width,
+                height,
+            };
+            assert_eq!(
+                validate_crop_rect(&crop, image_width, image_height).is_ok(),
+                valid,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn crop_preserves_source_pixels_and_rejects_invalid_rectangles() {
+        let source =
+            image::RgbaImage::from_fn(4, 3, |x, y| image::Rgba([x as u8, y as u8, 42, 255]));
+        let image = image::DynamicImage::ImageRgba8(source.clone());
+        let crop = CropRect {
+            x: 1,
+            y: 1,
+            width: 3,
+            height: 2,
+        };
+        let result = crop_dynamic_image(&image, &crop).unwrap().to_rgba8();
+        assert_eq!(result.dimensions(), (3, 2));
+        for (x, y, pixel) in result.enumerate_pixels() {
+            assert_eq!(pixel, source.get_pixel(x + 1, y + 1));
+        }
+        let invalid = CropRect { width: 4, ..crop };
+        assert!(crop_dynamic_image(&image, &invalid).is_err());
+    }
 }
 
 fn save_dynamic_image(

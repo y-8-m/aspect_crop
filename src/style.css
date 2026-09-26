@@ -268,7 +268,7 @@ button:hover:not(:disabled) {
 .zoom-viewport {
   min-width: 0;
   min-height: 0;
-  overflow: scroll;
+  overflow: auto;
   overscroll-behavior: contain;
 }
 
