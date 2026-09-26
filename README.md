@@ -1,37 +1,124 @@
 # Aspect Crop
 
-A small macOS desktop utility for fixed-aspect image cropping.
+縦横比を固定して画像を切り抜く、macOS向けの小さな画像編集ツール。日本語・EnglishのUIに対応。
 
-## MVP Features
+## 基本の使い方
 
-- Load one image by button, window drag-and-drop, or Dock drag-and-drop
-- Dock drop is supported on cold start (launching app with a file)
-- Pick fixed aspect presets: `1:1`, `4:3`, `16:9`, `3:2`
-- Move and resize crop frame while keeping the selected aspect
-- Crop frame is constrained inside image bounds
-- Preview cropped result
-- Save in the selected format without scaling original pixels
-- Reject unsupported input formats
+1. **画像を開く**ボタンから画像を選ぶか、ウィンドウへ画像ファイルをドロップする。
+2. **アスペクト比**を選び、横向き・縦向きを切り替える。
+3. クロップ枠の内側をドラッグして位置を調整し、枠のハンドルをドラッグしてサイズを変える。**クロップサイズ**の幅・高さから数値でも指定できる。
+4. **プレビュー**で切り抜き後の画像を確認する。
+5. **クロップ画像を保存**ボタンを押し、保存ダイアログでファイル名と保存先を選ぶ。
 
-## Controls
+保存時は元画像のピクセルをそのまま切り抜く。表示倍率を変えても、保存する画像のサイズやクロップ範囲は変わらない。
 
-- Drag inside frame: move
-- Drag handles: resize with fixed aspect
-- Arrow keys: move by 1px (`Shift + Arrow`: 10px)
-- Mouse wheel: zoom frame in/out around its center
-- `+` / `-`: zoom frame in/out around its center
+デスクトップ版では複数の画像を選択・ドロップすると、それぞれ別のウィンドウで開く。
 
-## Run
+## クロップ枠の操作
+
+| 操作 | 動作 |
+| --- | --- |
+| 枠の内側をドラッグ | クロップ枠を移動 |
+| ハンドルをドラッグ | 縦横比を保ってサイズ変更 |
+| 幅・高さを入力 | 選択中の縦横比を保ってクロップサイズを指定 |
+| 矢印キー | 元画像の1px単位で移動 |
+| Shift + 矢印キー | 元画像の10px単位で移動 |
+| 画像上でマウスホイール | クロップ枠を中心から拡大・縮小 |
+| + / − キー | クロップ枠を中心から拡大・縮小 |
+| Esc | プレビュー・設定を閉じる |
+
+キーボードでの枠操作は、入力欄などを操作していないときに使える。マウスホイールは**クロップ枠のサイズ**を変更する操作で、表示倍率は下のスライダーで変更する。
+
+## 表示倍率
+
+クロップ画面・プレビュー画面の下部にある**表示倍率**スライダーで、全体表示から100%まで調整できる。
+
+- **全体表示**：画像全体が表示領域に収まる倍率。
+- **100%**：元画像の1pxを画面上の1pxで表示する等倍表示。
+- 画像が表示領域を超えたときだけスクロールできる。
+- 小さい画像は拡大せず100%で表示し、スライダーは操作不要な状態になる。
+
+両画面の表示倍率は独立している。クロップ画面で全体を見ながら、プレビューでは100%で確認できる。
+
+## 設定
+
+ツールバーのスライダー型アイコンから設定を開く。設定は変更すると保存され、次回起動時にも引き継がれる。
+
+### 一般・保存
+
+**言語**
+
+「日本語」「English」から選択。初回はOS／ブラウザの言語に合わせ、日本語環境では日本語、それ以外ではEnglishになる。
+
+**保存形式**
+
+| 選択肢 | 保存方法 |
+| --- | --- |
+| 元画像と同じ | 元画像の形式で保存 |
+| PNG（可逆） | PNGで保存 |
+| JPEG（最高品質） | JPEGの最高品質で保存 |
+| WebP（可逆） | 可逆圧縮のWebPで保存 |
+| BMP（可逆） | BMPで保存 |
+
+静止GIFをGIFのまま保存する場合は「元画像と同じ」を選ぶ。
+
+**保存ダイアログの初期フォルダ**
+
+- **元画像と同じフォルダ**：元画像があるフォルダから開く。初期設定はこれ。
+- **前回保存したフォルダ**：最後に保存が成功したフォルダから開く。
+- **指定したフォルダ**：「変更」から固定のフォルダを選ぶ。
+
+ここで決めるのはダイアログを最初に開く場所だけ。保存するたびに別のフォルダへ移動できる。
+
+前回の保存先が未記録・利用不能なら、指定フォルダ、元画像のフォルダの順に使用する。指定フォルダが利用不能な場合も元画像のフォルダへ戻る。いずれも利用できない場合はOSの既定の場所から開く。
+
+### アスペクト比
+
+**カスタム比率を追加**で幅と高さを入力して「追加」を押す。たとえば幅 `4`、高さ `5` で `4:5` の比率になる。すでにある比率を入力した場合は、その比率を選択する。
+
+**保存済みの比率**では、登録した比率の選択、上下への並べ替え、削除ができる。比率の値は画像のピクセル数ではなく、幅と高さの割合。
+
+## 対応画像
+
+PNG・JPEG・WebP・GIF・BMPの静止画像に対応。アニメーションGIF・WebP・APNGには対応していない。
+
+## 開発・起動
+
+macOSでの開発には、Node.js / npm、Rust / Cargo、Xcode Command Line Toolsが必要。
 
 ```bash
 npm install
 npm run tauri -- dev
 ```
 
-`npm run tauri -- dev` auto-selects a free Vite port to avoid conflicts.
+開発起動時は空いているViteポートを自動で選択する。
 
-## Build
+ブラウザでUIを確認する場合：
 
 ```bash
+npm run dev
+```
+
+ブラウザ版は1枚ずつ読み込み、PNG・JPEGのダウンロード保存に対応する。保存先はブラウザ設定に従い、保存ダイアログの初期フォルダ設定はデスクトップ版で利用できる。
+
+### テスト
+
+```bash
+# フロントエンドのテスト
+npm test
+
+# Rust側のテスト
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+### ビルド
+
+```bash
+# フロントエンドの型チェックとビルド
+npm run build
+
+# デスクトップアプリのビルド
 npm run tauri -- build
 ```
+
+現在は配布用バンドルの生成を無効にしているため、デスクトップビルドでは実行ファイルを生成する。
