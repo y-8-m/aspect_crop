@@ -2,9 +2,6 @@
 name = "aspect-crop"
 version = "0.1.0"
 description = "Fast fixed-aspect image crop utility"
-authors = ["you"]
-license = ""
-repository = ""
 edition = "2021"
 rust-version = "1.70"
 
