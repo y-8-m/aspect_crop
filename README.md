@@ -296,4 +296,6 @@ npm run tauri -- build
 
 現在は個人利用を前提としたmacOS向けツールとして開発しています。
 
-今後は、アプリアイコンや配布用bundle設定など、macOSアプリとしての仕上げを進める予定です。
+アプリアイコンは `src-tauri/icons/Aspect_Crop.icon` に元データを保存し、内蔵SVGから生成したPNG・ICNS・ICOを設定しています。Icon Composerのガラス効果は、現在の静的アイコンには含まれていません。
+
+今後は、配布用bundle設定など、macOSアプリとしての仕上げを進める予定です。

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:affinity="https://www.affinity.studio/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
+    <g id="Background">
+        <rect id="background-fill" x="0" y="0" width="1024" height="1024" style="fill:rgb(22,140,130);"/>
+        <g id="background-fill1" affinity:id="background-fill" transform="matrix(0.75,0,0,0.475586,66,253)">
+            <rect x="0" y="0" width="1024" height="1024" style="fill:rgb(67,167,159);"/>
+        </g>
+    </g>
+    <g id="Crop-Frame" affinity:id="Crop Frame">
+        <g transform="matrix(1.28,0,0,1.28,-166.96,-159.826667)">
+            <g id="corner-top-left" transform="matrix(0.737549,0,0,0.754051,47.766113,79.195602)">
+                <path d="M310,322L182,322L182,430" style="fill:none;fill-rule:nonzero;stroke:white;stroke-width:28.13px;"/>
+            </g>
+            <g id="corner-top-right" transform="matrix(0.737549,0,0,0.754051,205.236816,79.195602)">
+                <path d="M654,322L782,322L782,430" style="fill:none;fill-rule:nonzero;stroke:white;stroke-width:28.13px;"/>
+            </g>
+            <g id="corner-bottom-left" transform="matrix(0.737549,0,0,0.754051,47.766113,172.65625)">
+                <path d="M182,594L182,702L310,702" style="fill:none;fill-rule:nonzero;stroke:white;stroke-width:28.13px;"/>
+            </g>
+            <g id="corner-bottom-right" transform="matrix(0.737549,0,0,0.754051,205.236816,172.65625)">
+                <path d="M654,702L782,702L782,594" style="fill:none;fill-rule:nonzero;stroke:white;stroke-width:28.13px;"/>
+            </g>
+        </g>
+    </g>
+    <g id="Ratio-Symbol" affinity:id="Ratio Symbol">
+        <g id="ratio-circles" transform="matrix(1,0,0,1,-32,0)">
+            <circle id="ratio-left" cx="336" cy="512" r="79.444" style="fill:none;stroke:white;stroke-width:28px;stroke-linecap:butt;stroke-linejoin:miter;"/>
+            <circle id="ratio-right" cx="628" cy="512" r="79.444" style="fill:none;stroke:white;stroke-width:28px;stroke-linecap:butt;stroke-linejoin:miter;"/>
+        </g>
+        <g id="ratio-colon" transform="matrix(1,0,0,1,-32,0)">
+            <circle id="colon-top" cx="482" cy="479" r="16" style="fill:white;"/>
+            <circle id="colon-bottom" cx="482" cy="545" r="16" style="fill:white;"/>
+        </g>
+    </g>
+</svg>
