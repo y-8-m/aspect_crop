@@ -284,18 +284,34 @@ cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-デスクトップアプリのビルド：
+macOS向けデスクトップアプリのビルド：
 
 ```bash
 npm run tauri -- build
 ```
 
-現在は配布用bundleの生成を無効にしているため、デスクトップビルドでは実行ファイルを生成します。
+Tauriのbundle設定を有効にしているため、macOSでは `.app` bundleを生成できます。
 
-## 今後
+アプリ名は **Aspect Crop**、bundle identifierは以下です。
+
+```text
+com.y8m.aspectcrop
+```
+
+## アプリアイコン
+
+アプリアイコンの元データは以下に保存しています。
+
+```text
+src-tauri/icons/Aspect_Crop.icon
+```
+
+Tauriで使用するPNG・ICNS・ICOも `src-tauri/icons/` に配置しています。
+
+macOS向けアプリでは `icon.icns` をbundleアイコンとして使用します。
+
+## 現在の状態
 
 現在は個人利用を前提としたmacOS向けツールとして開発しています。
 
-アプリアイコンは `src-tauri/icons/Aspect_Crop.icon` に元データを保存し、内蔵SVGから生成したPNG・ICNS・ICOを設定しています。Icon Composerのガラス効果は、現在の静的アイコンには含まれていません。
-
-今後は、配布用bundle設定など、macOSアプリとしての仕上げを進める予定です。
+主要機能の実装、テスト、アプリアイコン、bundle設定、macOS向け `.app` の生成および実機での起動確認まで完了しています。
