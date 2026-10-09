@@ -10,6 +10,7 @@ tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
 base64 = "0.22"
+gif = "0.14"
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "webp"] }
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "1.6", features = ["dialog-open", "dialog-save", "window-set-position", "window-set-size"] }
