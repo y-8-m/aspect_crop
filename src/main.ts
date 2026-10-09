@@ -1,3 +1,4 @@
+import { clearEditorImage } from "./editorSession";
 import { createBatchController } from "./batchController";
 import type {
   AspectPreset,
@@ -16,7 +17,6 @@ import {
   minCropSize,
   moveCrop,
   pointInRect,
-  recalcCropForAspect,
   resizeCrop,
   scaleCropFromCenter
 } from "./cropGeometry";
@@ -226,13 +226,37 @@ function captureEditor(): EditorSession {
 }
 let singleSession = captureEditor();
 let batchSession: EditorSession = { ...singleSession, image: null, imageName: "", imageSource: null, crop: null };
+const clearImageButton = document.createElement("button");
+clearImageButton.type = "button";
+openButton.after(clearImageButton);
+function refreshClearImage() {
+  clearImageButton.textContent = getLanguage() === "ja" ? "画像を解除" : "Clear image";
+  clearImageButton.hidden = openButton.hidden;
+  clearImageButton.disabled = !state.image;
+}
+onLanguageChange(refreshClearImage);
+function clearCurrentImage(): void {
+  clearPreview();
+  clearEditorImage(state);
+  editorZoom.setImage(0, 0, true);
+  previewZoom.setImage(0, 0, true);
+  previewButton.disabled = saveButton.disabled = true;
+  dropHint.classList.remove("hidden");
+  setStatus(msg("ready"));
+  renderCropState();
+  refreshClearImage();
+}
+clearImageButton.onclick = clearCurrentImage;
+refreshClearImage();
 const batch = createBatchController(runtime, {
   switchMode(isBatch) {
     if (isBatch) { singleSession = captureEditor(); Object.assign(state, batchSession); }
     else { batchSession = captureEditor(); Object.assign(state, singleSession); }
     state.drag = null;
     clearPreview();
+    must<HTMLElement>("#single-save-settings").hidden = isBatch;
     openButton.hidden = isBatch;
+    refreshClearImage();
     saveButton.hidden = isBatch;
     syncAspectUi();
     editorZoom.setImage(state.image?.naturalWidth ?? 0, state.image?.naturalHeight ?? 0, true);
@@ -241,10 +265,15 @@ const batch = createBatchController(runtime, {
     saveButton.disabled = !state.image;
     renderCropState();
   },
+  clear() {
+    clearCurrentImage();
+    dropHint.classList.add("hidden");
+  },
   async show(path, initialize) {
     // Release the old preview before loading another; no decoded-image cache grows with the list.
     state.image = null;
     state.imageSource = null;
+    state.imageName = "";
     state.drag = null;
     clearPreview();
     render();
@@ -261,8 +290,9 @@ const batch = createBatchController(runtime, {
   crop: () => state.crop ? roundedOutputCrop() : null,
   aspect: () => { const d = currentAspectDimensions(); return `${d.width}:${d.height}`; },
   format: () => state.outputFormatChoice,
-  lock(locked) {
-    for (const selector of [".toolbar-group-aspect", ".toolbar-group-size", ".toolbar-group-actions", "#editor-viewport"]) {
+  lock(locked, busy) {
+    addRatioButton.disabled = busy;
+    for (const selector of [".toolbar-group-aspect", ".toolbar-group-size", "#preview-button", "#save-button", "#editor-viewport"]) {
       must<HTMLElement>(selector).inert = locked;
     }
   }
@@ -401,6 +431,7 @@ function setupEvents(): void {
 
     state.outputFormatChoice = choice;
     persistOutputFormatChoice(choice);
+    batch.syncOutputFormat();
   });
 
   cropWidthInput.addEventListener("input", () => {
@@ -876,6 +907,7 @@ function applyLoadedImage(
 }
 
 function updateAfterLoad(): void {
+  refreshClearImage();
   resetCropToLargest();
   state.drag = null;
   clearPreview();
@@ -1005,6 +1037,7 @@ function onCanvasWheel(event: WheelEvent): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  if (batch.modalKey(event)) return;
   if (event.key === "Escape" && modalController.handleEscape()) {
     return;
   }
@@ -1218,7 +1251,7 @@ function imageRectToCanvasRect(rect: Rect): Rect {
 }
 
 function resetCropToLargest(): void {
-  if (!state.image) {
+  if (!editorDimensions().width || !editorDimensions().height) {
     state.crop = null;
     return;
   }
@@ -1479,19 +1512,13 @@ function storedAspectPresetById(presetId: string): AspectPreset | null {
 }
 
 function syncAspectChange(): void {
+  const previousAspect = state.aspect;
   syncAspectUi();
+  if (previousAspect === state.aspect) return;
 
-  if (!state.image || !state.crop) {
-    return;
-  }
-
-  state.crop = recalcCropForAspect(
-    state.crop,
-    state.aspect,
-    editorDimensions().width,
-    editorDimensions().height,
-    state.aspectPresets
-  );
+  resetCropToLargest();
+  state.drag = null;
+  clearPreview();
   renderCropState();
 }
 

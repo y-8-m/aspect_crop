@@ -28,3 +28,11 @@ export function batchTargets(state: BatchState): string[] {
 export function snapshotCrop(crop: Rect): Rect {
   return { x: Math.round(crop.x), y: Math.round(crop.y), width: Math.round(crop.width), height: Math.round(crop.height) };
 }
+
+// Accept the one-based position displayed by the UI; keep internal indices zero-based.
+export function setBatchIndex(state: BatchState, position: string | number): void {
+  if (typeof position === "string" && !position.trim()) return;
+  const value = Number(position);
+  if (!Number.isFinite(value)) return;
+  state.index = Math.max(0, Math.min(state.images.length - 1, Math.trunc(value) - 1));
+}
