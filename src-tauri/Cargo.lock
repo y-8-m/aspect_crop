@@ -52,6 +52,7 @@ name = "aspect-crop"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "gif",
  "image 0.25.10",
  "serde",
  "tauri",

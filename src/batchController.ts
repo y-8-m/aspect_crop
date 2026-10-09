@@ -120,6 +120,8 @@ export function createBatchController(runtime: RuntimeBridge, editor: Editor) {
       if (image?.status === "included") initialized = true;
     } catch (error) {
       await editor.show(null, false);
+      // Scanning only reads headers, so a corrupt image can first fail here; exclude it from the run.
+      if (image && image.status !== "invalid") { image.status = "invalid"; image.error = String(error); }
       setReport(String(error));
     }
   }

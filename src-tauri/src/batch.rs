@@ -1,10 +1,10 @@
 use super::{
     crop_dynamic_image, save_dynamic_image, CropRect, OutputFormat, WebpCompressionPreset,
 };
-use image::AnimationDecoder;
+use image::ImageDecoder;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -60,8 +60,8 @@ fn supported(path: &Path) -> bool {
         "png" | "jpg" | "jpeg" | "webp" | "bmp" | "gif"
     )
 }
-// Decode sequentially during validation too: a valid header alone does not establish a healthy reference.
-fn open_static(path: &Path) -> Result<image::DynamicImage, String> {
+// Inspect metadata without decoding pixel buffers; GIF stops at the second frame.
+fn inspect_static(path: &Path) -> Result<(u32, u32), String> {
     let reader = || {
         fs::File::open(path)
             .map(std::io::BufReader::new)
@@ -72,29 +72,110 @@ fn open_static(path: &Path) -> Result<image::DynamicImage, String> {
         .with_guessed_format()
         .map_err(|e| e.to_string())?
         .format();
-    let animated = match format {
-        Some(image::ImageFormat::Png) => image::codecs::png::PngDecoder::new(reader()?)
-            .map_err(|e| e.to_string())?
-            .is_apng()
-            .map_err(|e| e.to_string())?,
-        Some(image::ImageFormat::WebP) => image::codecs::webp::WebPDecoder::new(reader()?)
-            .map_err(|e| e.to_string())?
-            .has_animation(),
-        Some(image::ImageFormat::Gif) => {
-            image::codecs::gif::GifDecoder::new(reader()?)
-                .map_err(|e| e.to_string())?
-                .into_frames()
-                .take(2)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| e.to_string())?
-                .len()
-                > 1
+    let (dimensions, animated) = match format {
+        Some(image::ImageFormat::Png) => {
+            let decoder =
+                image::codecs::png::PngDecoder::new(reader()?).map_err(|e| e.to_string())?;
+            (
+                decoder.dimensions(),
+                decoder.is_apng().map_err(|e| e.to_string())?,
+            )
         }
-        _ => false,
+        Some(image::ImageFormat::WebP) => {
+            let decoder =
+                image::codecs::webp::WebPDecoder::new(reader()?).map_err(|e| e.to_string())?;
+            (decoder.dimensions(), decoder.has_animation())
+        }
+        Some(image::ImageFormat::Gif) => {
+            let mut options = gif::DecodeOptions::new();
+            options.skip_frame_decoding(true);
+            let mut decoder = options.read_info(reader()?).map_err(|e| e.to_string())?;
+            let dimensions = (u32::from(decoder.width()), u32::from(decoder.height()));
+            let mut count = 0;
+            while count < 2
+                && decoder
+                    .next_frame_info()
+                    .map_err(|e| e.to_string())?
+                    .is_some()
+            {
+                count += 1;
+            }
+            (dimensions, count > 1)
+        }
+        Some(image::ImageFormat::Jpeg | image::ImageFormat::Bmp) => (
+            image::ImageReader::open(path)
+                .map_err(|e| e.to_string())?
+                .with_guessed_format()
+                .map_err(|e| e.to_string())?
+                .into_dimensions()
+                .map_err(|e| e.to_string())?,
+            false,
+        ),
+        _ => return Err("Unsupported image format".into()),
     };
     if animated {
         return Err("Animated images are not supported".into());
     }
+    if let Some(format) = format {
+        ensure_complete(path, format, dimensions)?;
+    }
+    Ok(dimensions)
+}
+
+// Cheap truncation check (copy interrupted, partial download) without decoding pixels.
+// Corruption in the middle of the data is only found when the image is decoded.
+fn ensure_complete(
+    path: &Path,
+    format: image::ImageFormat,
+    (width, height): (u32, u32),
+) -> Result<(), String> {
+    use image::ImageFormat as F;
+    use std::io::{Read, Seek, SeekFrom};
+    const TAIL: u64 = 1024;
+    let truncated = || "File is incomplete (truncated)".to_string();
+    let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    let mut head = [0u8; 64];
+    let head_len = file.read(&mut head).map_err(|e| e.to_string())?;
+    let head = &head[..head_len];
+    file.seek(SeekFrom::Start(len.saturating_sub(TAIL)))
+        .map_err(|e| e.to_string())?;
+    let mut tail = Vec::new();
+    file.read_to_end(&mut tail).map_err(|e| e.to_string())?;
+    let complete = match format {
+        // Entropy-coded data byte-stuffs 0xFF, so FF D9 near the end is the real EOI marker.
+        F::Jpeg => tail.windows(2).any(|w| w == [0xFF, 0xD9]),
+        F::Png => tail.windows(4).any(|w| w == b"IEND"),
+        F::Gif => tail.iter().rev().find(|&&b| b != 0) == Some(&0x3B),
+        F::WebP => {
+            head.len() >= 8
+                && u64::from(u32::from_le_bytes(head[4..8].try_into().unwrap())) + 8 <= len
+        }
+        F::Bmp => {
+            let header_size = head.get(14..18).map(|b| u32::from_le_bytes(b.try_into().unwrap()));
+            let compression = head.get(30..34).map(|b| u32::from_le_bytes(b.try_into().unwrap()));
+            match (header_size, compression, head.get(10..14), head.get(28..30)) {
+                // Only uncompressed BITMAPINFOHEADER and later; RLE sizes are not predictable.
+                (Some(size), Some(0 | 3), Some(offset), Some(bpp)) if size >= 40 => {
+                    let offset = u64::from(u32::from_le_bytes(offset.try_into().unwrap()));
+                    let bpp = u64::from(u16::from_le_bytes(bpp.try_into().unwrap()));
+                    let stride = (u64::from(width) * bpp + 31) / 32 * 4;
+                    offset + stride * u64::from(height) <= len
+                }
+                _ => true,
+            }
+        }
+        _ => true,
+    };
+    if complete {
+        Ok(())
+    } else {
+        Err(truncated())
+    }
+}
+
+fn open_static(path: &Path) -> Result<image::DynamicImage, String> {
+    inspect_static(path)?;
     image::open(path).map_err(|e| e.to_string())
 }
 
@@ -139,8 +220,8 @@ pub fn scan(
     let mut result = Vec::new();
     for path in paths {
         let name = super::file_name_from_path(&path);
-        let (width, height, error) = match open_static(Path::new(&path)) {
-            Ok(image) => (image.width(), image.height(), None),
+        let (width, height, error) = match inspect_static(Path::new(&path)) {
+            Ok((width, height)) => (width, height, None),
             Err(error) => (0, 0, Some(error)),
         };
         result.push(Metadata {
@@ -198,18 +279,69 @@ fn format_for(choice: &str, path: &Path) -> Result<(OutputFormat, String), Strin
     Ok((format, extension.into()))
 }
 
+fn destination_for(output: &Path, source: &Path, choice: &str) -> Result<PathBuf, String> {
+    let (_, extension) = format_for(choice, source)?;
+    let mut destination = output.join(source.file_name().ok_or("Missing file name")?);
+    if choice != "same" {
+        destination.set_extension(extension);
+    }
+    Ok(destination)
+}
+
+// macOS and Windows filesystems are case-insensitive by default, so IMG.png and img.png collide.
+fn collision_key(path: PathBuf) -> PathBuf {
+    if cfg!(any(target_os = "macos", target_os = "windows")) {
+        PathBuf::from(path.to_string_lossy().to_lowercase())
+    } else {
+        path
+    }
+}
+
 pub fn run(request: Request, progress: impl Fn(Progress)) -> Result<Vec<FileResult>, String> {
     super::validate_crop_rect(&request.crop, request.width, request.height)?;
     let output = Path::new(&request.output);
     fs::create_dir_all(output).map_err(|e| e.to_string())?;
     let output = fs::canonicalize(output).map_err(|e| e.to_string())?;
-    // Reject input directories, including aliases, before any output is written.
-    for path in &request.paths {
-        let parent = Path::new(path).parent().unwrap_or(Path::new("."));
-        if fs::canonicalize(parent).map_err(|e| e.to_string())? == output {
-            return Err("Choose a separate output folder".into());
+    // Collect input failures, but check every valid source before writing anything.
+    let mut errors = vec![None; request.paths.len()];
+    for (index, path) in request.paths.iter().enumerate() {
+        let source = Path::new(path);
+        let parent = source
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        match fs::canonicalize(source).and_then(|_| fs::canonicalize(parent)) {
+            Ok(parent) if parent == output => return Err("Choose a separate output folder".into()),
+            Ok(_) => {}
+            Err(error) => errors[index] = Some(error.to_string()),
         }
-        format_for(&request.format, Path::new(path))?;
+    }
+    let mut destinations: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+    for (index, path) in request.paths.iter().enumerate() {
+        // Inputs that already failed will not write anything, so they cannot collide.
+        if errors[index].is_some() {
+            continue;
+        }
+        match destination_for(&output, Path::new(path), &request.format) {
+            Ok(destination) => {
+                // Rename allocates sequentially. Skip preserves existing-file skips.
+                if matches!(request.collision, Collision::Overwrite)
+                    || (matches!(request.collision, Collision::Skip) && !destination.exists())
+                {
+                    let normalized = fs::canonicalize(&destination).unwrap_or(destination);
+                    destinations
+                        .entry(collision_key(normalized))
+                        .or_default()
+                        .push(index);
+                }
+            }
+            Err(error) => errors[index] = Some(error),
+        }
+    }
+    for indices in destinations.values().filter(|indices| indices.len() > 1) {
+        for &index in indices {
+            errors[index] = Some("Multiple input files resolve to the same output path".into());
+        }
     }
     let probe = output.join(format!(
         ".aspect-crop-write-test-{}-{}",
@@ -229,15 +361,14 @@ pub fn run(request: Request, progress: impl Fn(Progress)) -> Result<Vec<FileResu
         .collect();
     let total = request.paths.len();
     let mut results = Vec::new();
-    for path in &request.paths {
+    for (index, path) in request.paths.iter().enumerate() {
         let outcome = (|| -> Result<&str, String> {
-            let source = Path::new(path);
-            let (format, extension) = format_for(&request.format, source)?;
-            let name = source.file_name().ok_or("Missing file name")?;
-            let mut destination = output.join(name);
-            if request.format != "same" {
-                destination.set_extension(extension);
+            if let Some(error) = &errors[index] {
+                return Err(error.clone());
             }
+            let source = Path::new(path);
+            let (format, _) = format_for(&request.format, source)?;
+            let destination = destination_for(&output, source, &request.format)?;
             let Some(destination) = output_path(&destination, request.collision) else {
                 return Ok("skipped");
             };
@@ -363,6 +494,195 @@ mod tests {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
+    #[test]
+    fn duplicate_destinations_fail_every_input_before_writing() {
+        for converted in [false, true] {
+            for reversed in [false, true] {
+                let f = Fixture::new();
+                fs::create_dir(f.0.join("a")).unwrap();
+                fs::create_dir(f.0.join("b")).unwrap();
+                let a = f.image("a/a.png", 4, 3);
+                let b = f.image(if converted { "b/a.bmp" } else { "b/a.png" }, 4, 3);
+                let next = f.image("next.png", 4, 3);
+                fs::create_dir(f.0.join("cropped")).unwrap();
+                fs::write(f.0.join("cropped/a.png"), b"keep").unwrap();
+                let mut paths = vec![a, b];
+                if reversed {
+                    paths.reverse();
+                }
+                paths.push(next);
+                let mut request = f.request(paths, Collision::Overwrite);
+                if converted {
+                    request.format = "png".into();
+                }
+                let progress = std::cell::RefCell::new(Vec::new());
+                let result = run(request, |p| {
+                    progress.borrow_mut().push((p.completed, p.total))
+                })
+                .unwrap();
+                assert!(result[..2].iter().all(|r| r.status == "failed"
+                    && r.error.as_ref().unwrap().contains("Multiple input files")));
+                assert_eq!(result[2].status, "success");
+                assert_eq!(*progress.borrow(), [(1, 3), (2, 3), (3, 3)]);
+                assert_eq!(fs::read(f.0.join("cropped/a.png")).unwrap(), b"keep");
+            }
+        }
+    }
+
+    #[test]
+    fn skip_duplicates_fail_without_existing_output_and_skip_with_existing_output() {
+        let f = Fixture::new();
+        let a = f.image("a.png", 4, 3);
+        let b = f.image("a.bmp", 4, 3);
+        for existing in [false, true] {
+            if existing {
+                fs::write(f.0.join("cropped/a.png"), b"keep").unwrap();
+            }
+            let mut request = f.request(vec![a.clone(), b.clone()], Collision::Skip);
+            request.format = "png".into();
+            let result = run(request, |_| {}).unwrap();
+            assert!(result
+                .iter()
+                .all(|r| r.status == if existing { "skipped" } else { "failed" }));
+        }
+        assert_eq!(fs::read(f.0.join("cropped/a.png")).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn deleted_inputs_and_format_errors_are_per_file() {
+        for remove_parent in [false, true] {
+            let f = Fixture::new();
+            fs::create_dir(f.0.join("gone")).unwrap();
+            let gone = f.image("gone/a.png", 4, 3);
+            let next = f.image("next.png", 4, 3);
+            let unsupported = f.0.join("unknown.xyz");
+            fs::write(&unsupported, b"bad").unwrap();
+            let request = f.request(
+                vec![
+                    gone.clone(),
+                    unsupported.to_string_lossy().into_owned(),
+                    next,
+                ],
+                Collision::Overwrite,
+            );
+            if remove_parent {
+                fs::remove_dir_all(f.0.join("gone")).unwrap();
+            } else {
+                fs::remove_file(gone).unwrap();
+            }
+            let result = run(request, |_| {}).unwrap();
+            assert_eq!(
+                result.iter().map(|r| r.status.as_str()).collect::<Vec<_>>(),
+                ["failed", "failed", "success"]
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_input_does_not_hide_global_input_folder_check() {
+        let f = Fixture::new();
+        let valid = f.image("valid.png", 4, 3);
+        let mut request = f.request(
+            vec![
+                f.0.join("gone/missing.png").to_string_lossy().into_owned(),
+                valid,
+            ],
+            Collision::Overwrite,
+        );
+        request.output = f.0.to_string_lossy().into_owned();
+        assert!(run(request, |_| {})
+            .err()
+            .unwrap()
+            .contains("separate output folder"));
+    }
+
+    #[test]
+    fn scan_flags_truncated_files_and_run_continues() {
+        let f = Fixture::new();
+        for extension in ["png", "jpg", "webp", "bmp", "gif"] {
+            let path = f.0.join(format!("image.{extension}"));
+            image::RgbImage::new(4, 3).save(&path).unwrap();
+            assert!(inspect_static(&path).is_ok(), "{extension} intact");
+            let bytes = fs::read(&path).unwrap();
+            // Cut only the EOI marker from JPEG; a deeper cut fails header parsing instead.
+            let cut = if extension == "jpg" { 2 } else { 10 };
+            fs::write(&path, &bytes[..bytes.len() - cut]).unwrap();
+            let error = inspect_static(&path).expect_err(extension);
+            // JPEG and GIF decoders may report the truncation themselves first.
+            if !["jpg", "gif"].contains(&extension) {
+                assert!(error.contains("incomplete"), "{extension}: {error}");
+            }
+        }
+        let broken = f.0.join("image.bmp").to_string_lossy().into_owned();
+        let next = f.image("next.png", 4, 3);
+        let progress = std::cell::RefCell::new(Vec::new());
+        let result = scan(vec![broken.clone(), next.clone()], None, |p| {
+            progress.borrow_mut().push((p.completed, p.total, p.name))
+        })
+        .unwrap();
+        assert!(result[0].error.as_ref().unwrap().contains("incomplete"));
+        assert!(result[1].error.is_none());
+        assert_eq!(
+            *progress.borrow(),
+            [(1, 2, "image.bmp".into()), (2, 2, "next.png".into())]
+        );
+        let result = run(f.request(vec![broken, next], Collision::Overwrite), |_| {}).unwrap();
+        assert_eq!(result[0].status, "failed");
+        assert_eq!(result[1].status, "success");
+    }
+
+    #[test]
+    fn inspect_dimensions_for_all_supported_formats() {
+        let f = Fixture::new();
+        for extension in ["png", "jpg", "webp", "bmp", "gif"] {
+            let path = f.0.join(format!("image.{extension}"));
+            image::RgbImage::new(4, 3).save(&path).unwrap();
+            assert_eq!(inspect_static(&path).unwrap(), (4, 3));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_symlink_to_source_is_rejected() {
+        let f = Fixture::new();
+        let source = f.image("a.png", 4, 3);
+        let original = fs::read(&source).unwrap();
+        fs::create_dir(f.0.join("cropped")).unwrap();
+        std::os::unix::fs::symlink(&source, f.0.join("cropped/a.png")).unwrap();
+        let result = run(
+            f.request(vec![source.clone()], Collision::Overwrite),
+            |_| {},
+        )
+        .unwrap();
+        assert_eq!(result[0].status, "failed");
+        assert_eq!(fs::read(source).unwrap(), original);
+    }
+
+    #[test]
+    fn case_variant_destinations_and_failed_inputs_are_handled() {
+        let f = Fixture::new();
+        fs::create_dir(f.0.join("a")).unwrap();
+        fs::create_dir(f.0.join("b")).unwrap();
+        let upper = f.image("a/IMG.bmp", 4, 3);
+        let lower = f.image("b/img.bmp", 4, 3);
+        let mut request = f.request(vec![upper.clone(), lower], Collision::Overwrite);
+        request.format = "png".into();
+        let result = run(request, |_| {}).unwrap();
+        let expected = if cfg!(any(target_os = "macos", target_os = "windows")) {
+            "failed"
+        } else {
+            "success"
+        };
+        assert!(result.iter().all(|r| r.status == expected));
+        // A missing input must not make a valid input look like a duplicate.
+        let missing = f.0.join("gone/IMG.bmp").to_string_lossy().into_owned();
+        let mut request = f.request(vec![missing, upper], Collision::Overwrite);
+        request.format = "png".into();
+        let result = run(request, |_| {}).unwrap();
+        assert_eq!(result[0].status, "failed");
+        assert_eq!(result[1].status, "success");
+    }
+
     #[test]
     fn webp_encoding_failure_keeps_batch_running_and_existing_output() {
         let f = Fixture::new();
