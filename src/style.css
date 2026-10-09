@@ -745,3 +745,17 @@ input:focus-visible {
     gap: 8px;
   }
 }
+
+/* Batch metadata stays outside the shared crop editor. */
+[hidden] { display: none !important; }
+.batch-panel { padding: 10px; border: 1px solid var(--border); border-radius: 6px; display: grid; gap: 8px; max-height: 42vh; overflow: auto; font-size: 13px; }
+.batch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.batch-row label { display: inline-flex; align-items: center; gap: 6px; }
+.batch-row input[type="checkbox"] { height: 18px; width: 18px; }
+#batch-output { flex: 1; min-width: 150px; }
+.batch-reason { color: var(--danger); }
+.batch-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 140px; overflow: auto; }
+.batch-panel progress { width: 100%; }
+.batch-panel [data-id="name"], .batch-panel [data-id="input"] { overflow-wrap: anywhere; }
+button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.workspace:has(.batch-panel:not([hidden])) { grid-template-rows: minmax(100px, 1fr) auto auto; }

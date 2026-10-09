@@ -315,3 +315,21 @@ macOS向けアプリでは `icon.icns` をbundleアイコンとして使用し�
 現在は個人利用を前提としたmacOS向けツールとして開発しています。
 
 主要機能の実装、テスト、アプリアイコン、bundle設定、macOS向け `.app` の生成および実機での起動確認まで完了しています。
+## Batch crop
+
+Switch **Single | Batch** in the toolbar. Single keeps its own image, crop and aspect selection when switching modes.
+
+Batch is available in the Tauri desktop app. Select multiple files or select a folder (only supported files directly inside it are scanned). Validation runs sequentially; the first successfully decoded, non-animated image establishes the reference dimensions. Matching images start included. Different-size and unreadable images remain inspectable in the batch metadata but cannot be included.
+
+Use the existing aspect presets, orientation, custom ratios, drag/resize and pixel-size controls to define **one shared source-pixel rectangle**. Browse with the previous/next buttons or left/right keys, and toggle inclusion with the checkbox or Space. Text fields, selects and open settings/preview dialogs retain their normal keyboard behavior. Different-size previews are read-only; they never rescale or change the shared rectangle.
+
+The suggested output directory is `cropped` beneath the input directory. Choose an output directory and a collision policy (rename, skip or overwrite) before running. Format follows the existing output-format setting; “same” preserves filenames including their extension. The confirmation shows the included count, rectangle, aspect, output directory, format and collision policy. Input directories are rejected as output directories. Source images are never overwritten.
+
+The Rust worker validates and processes images one at a time, rechecking dimensions before cropping. Progress is emitted to the initiating window. File errors are recorded and processing continues; output-directory setup failures stop the run. The expandable results show per-file status and errors. Output is encoded to a temporary file before publishing it, protecting existing files from encoder failures. The image list stores metadata only; previews are loaded on demand without a thumbnail cache.
+
+### Verification
+
+- `npm test`: existing save-folder, language and zoom coverage plus batch classification, inclusion, counts, targets and navigation tests.
+- `npm run build`: TypeScript and production bundle.
+- `cargo test --manifest-path src-tauri/Cargo.toml`: existing crop/save-folder tests plus batch folder scan, exact output pixels, sequential progress, per-file errors, collision policies, format/name preservation and input protection.
+- Browser smoke check: Single loading, aspect/pixel size, zoom, crop preview, PNG download, and mode round trip; Batch UI exercised with mocked Tauri IPC for folder input, arrows/Space, mismatch exclusion, editable-field key handling, confirmation payload and results. Actual image I/O is covered by Rust tests. Native OS dialogs and a several-thousand-image workload still need a desktop acceptance run.
