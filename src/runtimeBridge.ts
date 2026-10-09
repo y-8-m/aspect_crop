@@ -2,7 +2,7 @@ import { t, LocalizedError } from "./i18n";
 import { invoke } from "@tauri-apps/api/tauri";
 import { saveDefaultPath } from "./saveFolder";
 
-import type { OutputCrop, OutputFormat, WindowBounds } from "./appTypes";
+import type { OutputCrop, OutputFormat, WindowBounds, WebpCompressionPreset } from "./appTypes";
 import {
   mimeTypeForFormat,
   outputFormatExtensions,
@@ -39,14 +39,16 @@ export type RuntimeBridge = {
     defaultName: string,
     crop: OutputCrop,
     format: OutputFormat,
-    initialFolder?: string
+    initialFolder?: string,
+    webpCompression?: WebpCompressionPreset
   ): Promise<SaveResult>;
   saveCroppedImageFromBytes(
     sourceBytes: Uint8Array,
     defaultName: string,
     crop: OutputCrop,
     format: OutputFormat,
-    initialFolder?: string
+    initialFolder?: string,
+    webpCompression?: WebpCompressionPreset
   ): Promise<SaveResult>;
   restoreWindowBounds(bounds: WindowBounds): Promise<void>;
   onWindowBoundsChanged(listener: () => void): Promise<void>;
@@ -129,7 +131,8 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       defaultName: string,
       crop: OutputCrop,
       format: OutputFormat,
-      initialFolder?: string
+      initialFolder?: string,
+      webpCompression: WebpCompressionPreset = "balanced"
     ): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
       const savePath = await save(saveDialogOptions(defaultName, format, initialFolder));
@@ -144,6 +147,7 @@ function createTauriRuntimeBridge(): RuntimeBridge {
         sourcePath,
         outputPath: resolvedPath,
         crop,
+        webpCompression: webpCompression ?? "balanced",
         format
       });
 
@@ -154,7 +158,8 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       defaultName: string,
       crop: OutputCrop,
       format: OutputFormat,
-      initialFolder?: string
+      initialFolder?: string,
+      webpCompression: WebpCompressionPreset = "balanced"
     ): Promise<SaveResult> {
       const { save } = await getTauriDialogApi();
       const savePath = await save(saveDialogOptions(defaultName, format, initialFolder));
@@ -169,6 +174,7 @@ function createTauriRuntimeBridge(): RuntimeBridge {
         sourceBase64: bytesToBase64(sourceBytes),
         outputPath: resolvedPath,
         crop,
+        webpCompression: webpCompression ?? "balanced",
         format
       });
 

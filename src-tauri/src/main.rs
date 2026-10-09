@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::Manager;
 mod batch;
+mod webp_output;
+use webp_output::WebpCompressionPreset;
 mod save_folder;
 static BATCH_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -108,12 +110,13 @@ fn crop_image_to_file(
     output_path: String,
     crop: CropRect,
     format: OutputFormat,
+    webp_compression: WebpCompressionPreset,
 ) -> Result<(), String> {
     let image =
         image::open(&source_path).map_err(|error| format!("Failed to open image: {error}"))?;
     let cropped = crop_dynamic_image(&image, &crop)?;
 
-    save_dynamic_image(&cropped, &output_path, format)
+    save_dynamic_image(&cropped, &output_path, format, webp_compression)
 }
 
 #[tauri::command]
@@ -122,6 +125,7 @@ fn crop_image_data_to_file(
     output_path: String,
     crop: CropRect,
     format: OutputFormat,
+    webp_compression: WebpCompressionPreset,
 ) -> Result<(), String> {
     let source_bytes = STANDARD
         .decode(&source_base64)
@@ -130,7 +134,7 @@ fn crop_image_data_to_file(
         .map_err(|error| format!("Failed to decode source image: {error}"))?;
     let cropped = crop_dynamic_image(&image, &crop)?;
 
-    save_dynamic_image(&cropped, &output_path, format)
+    save_dynamic_image(&cropped, &output_path, format, webp_compression)
 }
 
 fn validate_crop_rect(crop: &CropRect, image_width: u32, image_height: u32) -> Result<(), String> {
@@ -231,6 +235,7 @@ fn save_dynamic_image(
     image: &image::DynamicImage,
     output_path: &str,
     format: OutputFormat,
+    webp_compression: WebpCompressionPreset,
 ) -> Result<(), String> {
     match format {
         OutputFormat::Png => image
@@ -252,12 +257,8 @@ fn save_dynamic_image(
                 .map_err(|error| format!("Failed to save JPEG image: {error}"))
         }
         OutputFormat::Webp => {
-            let file = File::create(output_path)
-                .map_err(|error| format!("Failed to create file: {error}"))?;
-            let writer = BufWriter::new(file);
-            let encoder = image::codecs::webp::WebPEncoder::new_lossless(writer);
-            image
-                .write_with_encoder(encoder)
+            let bytes = webp_output::encode(image, webp_compression)?;
+            std::fs::write(output_path, &*bytes)
                 .map_err(|error| format!("Failed to save WebP image: {error}"))
         }
     }

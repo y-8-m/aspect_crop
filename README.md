@@ -333,3 +333,38 @@ The Rust worker validates and processes images one at a time, rechecking dimensi
 - `npm run build`: TypeScript and production bundle.
 - `cargo test --manifest-path src-tauri/Cargo.toml`: existing crop/save-folder tests plus batch folder scan, exact output pixels, sequential progress, per-file errors, collision policies, format/name preservation and input protection.
 - Browser smoke check: Single loading, aspect/pixel size, zoom, crop preview, PNG download, and mode round trip; Batch UI exercised with mocked Tauri IPC for folder input, arrows/Space, mismatch exclusion, editable-field key handling, confirmation payload and results. Actual image I/O is covered by Rust tests. Native OS dialogs and a several-thousand-image workload still need a desktop acceptance run.
+
+
+### WebP ロスレス圧縮
+
+デスクトップ版の共通出力設定で「高速 / 標準 / サイズ優先」を選べます。すべてロスレスで、画質差はありません。透明部分のRGBを含めて画素を保持し、変わるのは処理時間とファイルサイズのバランスだけです。サイズ優先ほど保存に時間がかかりますが、画像によってサイズの差や大小関係は変わります。
+
+初期値は「標準」。`aspect-crop.webp-compression-preset` に保存され、再起動後も維持されます。Single / Batch共通で、「元画像と同じ」でWebPを保存するときにも適用されます。混在Batchの他形式には影響しません。ブラウザプレビューではこの設定は使用できません。
+
+内部実装は `webp 0.3.1`（default features無効）と `libwebp-sys 0.9.6`。Singleのパス／メモリ保存とBatchは `save_dynamic_image` から同じエンコーダを使用します。全プリセットで `lossless=1`, `near_lossless=100`, `exact=1`。libwebpのlossless時のqualityは探索量であり、画質設定ではありません。
+
+| プリセット | quality（探索量） | method |
+| --- | ---: | ---: |
+| 高速 / fast | 20 | 0 |
+| 標準 / balanced | 75 | 4 |
+| サイズ優先 / smallest | 100 | 6 |
+
+追加依存は `webp`, `libwebp-sys`, `jobserver`。libwebpは同梱Cソースから静的ビルドされ、Cコンパイラが必要ですが、別途libwebpのインストールやCMakeは不要です。macOSでビルド・テスト確認済み。bindingのビルド処理はWindows MSVCにも対応していますが、Windows実機ビルドは未確認です。Tauriの依存指定 `1.6` は変更していません（現行lockは1.8.3）。
+
+Rust要件には既存の不一致があります。Cargo.tomlの宣言は1.70ですが、現行lockの `image 0.25.10` は1.88以上が必要です。追加された `jobserver 0.1.35` は1.85以上を要求するため、既存lockの実質要件は上がりません。今回の検証はRust 1.93.1で実施し、1.70互換性は保証しません。
+
+開発用比較（1024×768の決定的な合成UI fixture：パネル、文字風ストローク、イラスト、テクスチャ付きグラデーション）：
+
+```sh
+cargo test --manifest-path src-tauri/Cargo.toml --no-default-features webp_comparison -- --ignored --nocapture
+```
+
+macOS / debugビルドでの1回の参考値（実写写真や実際のスクリーンショットではなく合成画像。環境・画像により変動）：
+
+| プリセット | 出力サイズ | エンコード時間 |
+| --- | ---: | ---: |
+| fast | 197,290 bytes | 38.35 ms |
+| balanced | 130,966 bytes | 554.77 ms |
+| smallest | 89,562 bytes | 1,763.99 ms |
+
+比較コードは全プリセットのデコード後画素一致も確認します。通常テストには透明／半透明RGBA、設定永続化、モード切替、Singleのパス／メモリ保存、混在形式Batch、WebPエラー後の続行・既存ファイル保護を含みます。サイズの固定比率はテスト条件にしていません。

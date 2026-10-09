@@ -749,16 +749,12 @@ input:focus-visible {
 
 /* Batch metadata stays outside the shared crop editor. */
 [hidden] { display: none !important; }
-.batch-panel { padding: 10px; border-top: 1px solid var(--border-subtle); display: grid; gap: 14px; max-height: 42vh; overflow: auto; font-size: 13px; }
 .batch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .batch-row label { display: inline-flex; align-items: center; gap: 6px; }
 .batch-row input[type="checkbox"] { height: 18px; width: 18px; }
 #batch-output { flex: 1; min-width: 150px; }
 .batch-reason { color: var(--danger); }
-.batch-panel progress { width: 100%; }
-.batch-panel [data-id="name"], .batch-panel [data-id="input"] { overflow-wrap: anywhere; }
 button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-.workspace:has(.batch-panel:not([hidden])) { grid-template-rows: minmax(100px, 1fr) auto auto; }
 
 .batch-position { width: 6em; text-align: center; }
 .batch-results-content { grid-template-rows: auto minmax(0, 1fr); }
@@ -767,6 +763,27 @@ button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(
 
 .single-save-settings { padding-top: 14px; border-top: 1px solid var(--border-subtle); }
 .output-settings > .settings-field-help { margin: 0; }
-.batch-section { display: grid; gap: 8px; min-width: 0; }
-.batch-section + .batch-section { border-top: 1px solid var(--border-subtle); padding-top: 12px; }
-.batch-section h3 { margin: 0; font-size: 13px; font-weight: 600; }
+
+.editor-utility-bar { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 52px; }
+.editor-utility-bar .zoom-controls { margin-left: auto; flex-shrink: 0; }
+.batch-navigation { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.batch-navigation label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.batch-navigation input[type="checkbox"] { width: 18px; height: 18px; }
+.batch-navigation [data-id="name"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 24px; }
+.batch-navigation button, .batch-position { flex-shrink: 0; }
+.batch-position { width: 5em; }
+.status-row progress { width: 90px; height: 8px; margin-left: 8px; }
+.batch-reason:not(:empty) { margin-left: 12px; }
+.batch-save-modal { width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; background: var(--app-bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: 10px; padding: 24px; }
+.batch-save-modal::backdrop { background: #0008; }
+.batch-save-modal h2 { margin-top: 0; font-size: 20px; }
+.batch-save-modal .batch-row { margin-top: 16px; }
+.batch-save-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.toolbar-group-open { min-width: 330px; }
+@media (max-width: 850px) {
+  .toolbar-group-open { min-width: 0; }
+  .editor-utility-bar { flex-wrap: wrap; gap: 0; }
+  .batch-navigation { width: 100%; }
+}
+
+.batch-input button { white-space: nowrap; padding-inline: 10px; flex-shrink: 0; }
