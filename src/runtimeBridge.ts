@@ -28,9 +28,10 @@ export type RuntimeBridge = {
   getWindowLabel(): Promise<string>;
   openImageDialog(extensions: string[]): Promise<string[]>;
   readImageBytes(path: string): Promise<Uint8Array>;
+  readBatchPreview(path: string): Promise<Uint8Array>;
   openImageWindows(paths: string[], templateBounds: WindowBounds | null): Promise<void>;
   takeStartupPath(): Promise<string | null>;
-  openFolderDialog(defaultPath?: string): Promise<string | null>;
+  openFolderDialog(defaultPath?: string, title?: string): Promise<string | null>;
   isSaveFolderAvailable(path: string): Promise<boolean>;
   saveImage(defaultName: string, bytes: Uint8Array, format: OutputFormat, initialFolder?: string): Promise<SaveResult>;
   saveCroppedImageFromPath(
@@ -81,6 +82,9 @@ function createTauriRuntimeBridge(): RuntimeBridge {
 
       return Array.isArray(selection) ? selection : [selection];
     },
+    async readBatchPreview(path: string): Promise<Uint8Array> {
+      return base64ToBytes(await invoke<string>("read_batch_preview", { path }));
+    },
     async readImageBytes(path: string): Promise<Uint8Array> {
       const base64 = await invoke<string>("read_image_file", { path });
       return base64ToBytes(base64);
@@ -95,9 +99,9 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       const windowLabel = await this.getWindowLabel();
       return invoke<string | null>("take_window_file_path", { windowLabel });
     },
-    async openFolderDialog(defaultPath?: string): Promise<string | null> {
+    async openFolderDialog(defaultPath?: string, title?: string): Promise<string | null> {
       const { open } = await getTauriDialogApi();
-      const selection = await open({ directory: true, multiple: false, defaultPath, title: t("saveFolder") });
+      const selection = await open({ directory: true, multiple: false, defaultPath, title: title ?? t("saveFolder") });
       return typeof selection === "string" ? selection : null;
     },
     async isSaveFolderAvailable(path: string): Promise<boolean> {
@@ -225,6 +229,9 @@ function createWebRuntimeBridge(): RuntimeBridge {
     },
     async openImageDialog(): Promise<string[]> {
       return [];
+    },
+    async readBatchPreview(): Promise<Uint8Array> {
+      throw new LocalizedError("desktopPaths");
     },
     async readImageBytes(): Promise<Uint8Array> {
       throw new LocalizedError("desktopPaths");

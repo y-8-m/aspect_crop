@@ -1,3 +1,4 @@
+import { createBatchController } from "./batchController";
 import type {
   AspectPreset,
   DragState,
@@ -217,6 +218,59 @@ const modalController = createModalController({
   }
 });
 
+// Each mode owns its editor session; only the active session uses the shared canvas.
+type EditorSession = Pick<typeof state, "image" | "imageName" | "imageSource" | "crop" | "selectedAspectId" | "isAspectSwapped" | "aspect">;
+function captureEditor(): EditorSession {
+  const { image, imageName, imageSource, crop, selectedAspectId, isAspectSwapped, aspect } = state;
+  return { image, imageName, imageSource, crop, selectedAspectId, isAspectSwapped, aspect };
+}
+let singleSession = captureEditor();
+let batchSession: EditorSession = { ...singleSession, image: null, imageName: "", imageSource: null, crop: null };
+const batch = createBatchController(runtime, {
+  switchMode(isBatch) {
+    if (isBatch) { singleSession = captureEditor(); Object.assign(state, batchSession); }
+    else { batchSession = captureEditor(); Object.assign(state, singleSession); }
+    state.drag = null;
+    clearPreview();
+    openButton.hidden = isBatch;
+    saveButton.hidden = isBatch;
+    syncAspectUi();
+    editorZoom.setImage(state.image?.naturalWidth ?? 0, state.image?.naturalHeight ?? 0, true);
+    dropHint.classList.toggle("hidden", isBatch || !!state.image);
+    previewButton.disabled = !state.image;
+    saveButton.disabled = !state.image;
+    renderCropState();
+  },
+  async show(path, initialize) {
+    // Release the old preview before loading another; no decoded-image cache grows with the list.
+    state.image = null;
+    state.imageSource = null;
+    state.drag = null;
+    clearPreview();
+    render();
+    if (path) {
+      const bytes = await runtime.readBatchPreview(path);
+      state.image = await decodeImage(bytes);
+      state.imageName = fileNameFromPath(path);
+      if (initialize) resetCropToLargest();
+    }
+    editorZoom.setImage(state.image?.naturalWidth ?? 0, state.image?.naturalHeight ?? 0, true);
+    previewButton.disabled = !state.image;
+    renderCropState();
+  },
+  crop: () => state.crop ? roundedOutputCrop() : null,
+  aspect: () => { const d = currentAspectDimensions(); return `${d.width}:${d.height}`; },
+  format: () => state.outputFormatChoice,
+  lock(locked) {
+    for (const selector of [".toolbar-group-aspect", ".toolbar-group-size", ".toolbar-group-actions", "#editor-viewport"]) {
+      must<HTMLElement>(selector).inert = locked;
+    }
+  }
+});
+function editorDimensions(): { width: number; height: number } {
+  return batch.reference() ?? { width: state.image?.naturalWidth ?? 0, height: state.image?.naturalHeight ?? 0 };
+}
+
 const fileDropController = createFileDropController({
   runtimeKind: runtime.kind,
   dropZone,
@@ -225,6 +279,7 @@ const fileDropController = createFileDropController({
     await openPathBatch(paths, "drop");
   },
   loadFile: async (file) => {
+    if (batch.active()) return state.imageName;
     await loadImageFromFile(file);
     return state.imageName;
   },
@@ -471,6 +526,7 @@ async function openImagesFromDialog(): Promise<void> {
 }
 
 async function openPathBatch(rawPaths: string[], source: PathBatchSource): Promise<void> {
+  if (batch.active()) { await batch.load(rawPaths); return; }
   if (!isTauriRuntime) {
     throw new LocalizedError("desktopPaths");
   }
@@ -850,6 +906,7 @@ async function decodeImage(bytes: Uint8Array): Promise<HTMLImageElement> {
 }
 
 function onPointerDown(event: PointerEvent): void {
+  if (!batch.editable()) return;
   if (!state.crop || !state.imageRect || !state.image) {
     return;
   }
@@ -897,8 +954,8 @@ function onPointerMove(event: PointerEvent): void {
   const dx = (point.x - state.drag.startPoint.x) / scale;
   const dy = (point.y - state.drag.startPoint.y) / scale;
 
-  const imageWidth = state.image.naturalWidth;
-  const imageHeight = state.image.naturalHeight;
+  const imageWidth = editorDimensions().width;
+  const imageHeight = editorDimensions().height;
 
   if (state.drag.mode === "move") {
     state.crop = moveCrop(state.drag.startCrop, dx, dy, imageWidth, imageHeight);
@@ -929,6 +986,7 @@ function onPointerUp(event: PointerEvent): void {
 }
 
 function onCanvasWheel(event: WheelEvent): void {
+  if (!batch.editable()) return;
   if (!state.image || !state.crop) {
     return;
   }
@@ -938,8 +996,8 @@ function onCanvasWheel(event: WheelEvent): void {
   state.crop = scaleCropFromCenter(
     state.crop,
     factor,
-    state.image.naturalWidth,
-    state.image.naturalHeight,
+    editorDimensions().width,
+    editorDimensions().height,
     state.aspect,
     state.aspectPresets
   );
@@ -952,6 +1010,7 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 
   if (modalController.isPreviewOpen() || modalController.isRatioOpen()) return;
+  if (!isEditableTarget(event.target) && batch.key(event)) return;
 
   if (!state.image || !state.crop) {
     return;
@@ -962,8 +1021,8 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 
   const step = event.shiftKey ? 10 : 1;
-  const imageWidth = state.image.naturalWidth;
-  const imageHeight = state.image.naturalHeight;
+  const imageWidth = editorDimensions().width;
+  const imageHeight = editorDimensions().height;
 
   switch (event.key) {
     case "ArrowLeft":
@@ -1165,8 +1224,8 @@ function resetCropToLargest(): void {
   }
 
   state.crop = largestCropRect(
-    state.image.naturalWidth,
-    state.image.naturalHeight,
+    editorDimensions().width,
+    editorDimensions().height,
     state.aspect,
     state.aspectPresets
   );
@@ -1187,14 +1246,14 @@ function updateMetaLabels(): void {
 }
 
 function roundedOutputCrop(): OutputCrop {
-  if (!state.image || !state.crop) {
+  if ((!state.image && !batch.reference()) || !state.crop) {
     return { x: 0, y: 0, width: 1, height: 1 };
   }
 
-  const x = clamp(Math.round(state.crop.x), 0, state.image.naturalWidth - 1);
-  const y = clamp(Math.round(state.crop.y), 0, state.image.naturalHeight - 1);
-  const width = clamp(Math.round(state.crop.width), 1, state.image.naturalWidth - x);
-  const height = clamp(Math.round(state.crop.height), 1, state.image.naturalHeight - y);
+  const x = clamp(Math.round(state.crop.x), 0, editorDimensions().width - 1);
+  const y = clamp(Math.round(state.crop.y), 0, editorDimensions().height - 1);
+  const width = clamp(Math.round(state.crop.width), 1, editorDimensions().width - x);
+  const height = clamp(Math.round(state.crop.height), 1, editorDimensions().height - y);
 
   return { x, y, width, height };
 }
@@ -1319,8 +1378,8 @@ function resizeCropToDimensions(targetWidth: number, targetHeight: number): void
     return;
   }
 
-  const imageWidth = state.image.naturalWidth;
-  const imageHeight = state.image.naturalHeight;
+  const imageWidth = editorDimensions().width;
+  const imageHeight = editorDimensions().height;
   const centerX = state.crop.x + state.crop.width / 2;
   const centerY = state.crop.y + state.crop.height / 2;
   const largest = largestCropRect(imageWidth, imageHeight, state.aspect, state.aspectPresets);
@@ -1429,8 +1488,8 @@ function syncAspectChange(): void {
   state.crop = recalcCropForAspect(
     state.crop,
     state.aspect,
-    state.image.naturalWidth,
-    state.image.naturalHeight,
+    editorDimensions().width,
+    editorDimensions().height,
     state.aspectPresets
   );
   renderCropState();

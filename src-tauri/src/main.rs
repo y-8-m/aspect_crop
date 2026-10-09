@@ -9,7 +9,46 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::Manager;
+mod batch;
 mod save_folder;
+static BATCH_ID: AtomicU64 = AtomicU64::new(1);
+
+#[tauri::command]
+async fn read_batch_preview(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        batch::preview(&path).map(|bytes| STANDARD.encode(bytes))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn scan_batch(
+    window: tauri::Window,
+    paths: Vec<String>,
+    folder: Option<String>,
+) -> Result<Vec<batch::Metadata>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        batch::scan(paths, folder, |p| {
+            let _ = window.emit("batch-scan", p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn run_batch(
+    window: tauri::Window,
+    request: batch::Request,
+) -> Result<Vec<batch::FileResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        batch::run(request, |p| {
+            let _ = window.emit("batch-progress", p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 fn is_save_folder_available(path: String) -> bool {
@@ -204,8 +243,8 @@ fn save_dynamic_image(
             .save_with_format(output_path, image::ImageFormat::Gif)
             .map_err(|error| format!("Failed to save GIF image: {error}")),
         OutputFormat::Jpeg => {
-            let file =
-                File::create(output_path).map_err(|error| format!("Failed to create file: {error}"))?;
+            let file = File::create(output_path)
+                .map_err(|error| format!("Failed to create file: {error}"))?;
             let writer = BufWriter::new(file);
             let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, 100);
             image
@@ -213,8 +252,8 @@ fn save_dynamic_image(
                 .map_err(|error| format!("Failed to save JPEG image: {error}"))
         }
         OutputFormat::Webp => {
-            let file =
-                File::create(output_path).map_err(|error| format!("Failed to create file: {error}"))?;
+            let file = File::create(output_path)
+                .map_err(|error| format!("Failed to create file: {error}"))?;
             let writer = BufWriter::new(file);
             let encoder = image::codecs::webp::WebPEncoder::new_lossless(writer);
             image
@@ -332,6 +371,9 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            read_batch_preview,
+            scan_batch,
+            run_batch,
             read_image_file,
             is_save_folder_available,
             save_image_file,
