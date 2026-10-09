@@ -251,6 +251,20 @@ mod crop_tests {
     }
 
     #[test]
+    fn jpeg_output_composites_transparency_on_white() {
+        let source = image::RgbaImage::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                image::Rgba([0, 0, 0, 0])
+            } else {
+                image::Rgba([10, 20, 30, 255])
+            }
+        });
+        let flat = flatten_on_white(&image::DynamicImage::ImageRgba8(source)).to_rgb8();
+        assert_eq!(flat.get_pixel(0, 0).0, [255, 255, 255]);
+        assert_eq!(flat.get_pixel(1, 0).0, [10, 20, 30]);
+    }
+
+    #[test]
     fn exif_orientation_is_applied_before_cropping() {
         // 4x2 JPEG tagged Orientation=6 (rotate 90 CW) must be treated as 2x4.
         let mut jpeg = Vec::new();
@@ -275,6 +289,22 @@ mod crop_tests {
     }
 }
 
+fn flatten_on_white(image: &image::DynamicImage) -> image::DynamicImage {
+    if !image.color().has_alpha() {
+        return image.clone();
+    }
+    let mut rgba = image.to_rgba8();
+    for pixel in rgba.pixels_mut() {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel.0[..3] {
+            // Rounded alpha blend against 255.
+            *channel = ((u32::from(*channel) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;
+        }
+        pixel[3] = 255;
+    }
+    image::DynamicImage::ImageRgb8(image::DynamicImage::ImageRgba8(rgba).to_rgb8())
+}
+
 fn save_dynamic_image(
     image: &image::DynamicImage,
     output_path: &str,
@@ -296,7 +326,9 @@ fn save_dynamic_image(
                 .map_err(|error| format!("Failed to create file: {error}"))?;
             let writer = BufWriter::new(file);
             let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, 100);
-            image
+            // JPEG has no alpha: composite onto white instead of exposing the RGB under transparency.
+            let flattened = flatten_on_white(image);
+            flattened
                 .write_with_encoder(encoder)
                 .map_err(|error| format!("Failed to save JPEG image: {error}"))
         }

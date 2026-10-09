@@ -291,7 +291,9 @@ fn destination_for(output: &Path, source: &Path, choice: &str) -> Result<PathBuf
 // macOS and Windows filesystems are case-insensitive by default, so IMG.png and img.png collide.
 fn collision_key(path: PathBuf) -> PathBuf {
     if cfg!(any(target_os = "macos", target_os = "windows")) {
-        PathBuf::from(path.to_string_lossy().to_lowercase())
+        // APFS and NTFS also treat canonically equivalent Unicode names (NFC/NFD) as equal.
+        use unicode_normalization::UnicodeNormalization;
+        PathBuf::from(path.to_string_lossy().nfc().collect::<String>().to_lowercase())
     } else {
         path
     }
@@ -681,6 +683,21 @@ mod tests {
         let result = run(request, |_| {}).unwrap();
         assert_eq!(result[0].status, "failed");
         assert_eq!(result[1].status, "success");
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[test]
+    fn unicode_equivalent_names_collide() {
+        let f = Fixture::new();
+        fs::create_dir(f.0.join("a")).unwrap();
+        fs::create_dir(f.0.join("b")).unwrap();
+        // Same visible name: precomposed vs decomposed "\u{e9}".
+        let nfc = f.image("a/\u{e9}.bmp", 4, 3);
+        let nfd = f.image("b/e\u{301}.bmp", 4, 3);
+        let mut request = f.request(vec![nfc, nfd], Collision::Overwrite);
+        request.format = "png".into();
+        let result = run(request, |_| {}).unwrap();
+        assert!(result.iter().all(|r| r.status == "failed"));
     }
 
     #[test]
