@@ -92,9 +92,21 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       return base64ToBytes(base64);
     },
     async openImageWindows(paths: string[], templateBounds: WindowBounds | null): Promise<void> {
+      // Stored bounds stay physical; WindowBuilder expects logical coordinates.
+      let logicalBounds = templateBounds;
+      if (templateBounds) {
+        const { appWindow } = await getTauriWindowApi();
+        const scale = await appWindow.scaleFactor();
+        logicalBounds = {
+          x: templateBounds.x / scale,
+          y: templateBounds.y / scale,
+          width: templateBounds.width / scale,
+          height: templateBounds.height / scale
+        };
+      }
       await invoke("open_image_windows", {
         paths,
-        templateBounds
+        templateBounds: logicalBounds
       });
     },
     async takeStartupPath(): Promise<string | null> {

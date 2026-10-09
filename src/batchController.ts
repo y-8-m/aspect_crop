@@ -114,15 +114,29 @@ export function createBatchController(runtime: RuntimeBridge, editor: Editor) {
     finally { busy = false; refresh(); }
   }
   async function preview() {
-    const image = state.images[state.index];
-    try {
-      await editor.show(image && image.status !== "invalid" ? image.path : null, !initialized && image?.status === "included");
-      if (image?.status === "included") initialized = true;
-    } catch (error) {
-      await editor.show(null, false);
-      // Scanning only reads headers, so a corrupt image can first fail here; exclude it from the run.
-      if (image && image.status !== "invalid") { image.status = "invalid"; image.error = String(error); }
-      setReport(String(error));
+    while (true) {
+      const image = state.images[state.index];
+      try {
+        await editor.show(image && image.status !== "invalid" ? image.path : null, !initialized && image?.status === "included");
+        if (image?.status === "included") initialized = true;
+        return;
+      } catch (error) {
+        await editor.show(null, false);
+        // Scanning only reads headers, so a corrupt image can first fail here; exclude it from the run.
+        if (image && image.status !== "invalid") { image.status = "invalid"; image.error = String(error); }
+        setReport(String(error));
+        if (!initialized && image) {
+          // A header-only scan may choose a corrupt reference. Retry sequentially
+          // until a preview decodes, reclassifying sizes before initializing its crop.
+          state = createBatch(state.images);
+          const next = state.images.findIndex(candidate => candidate.status === "included");
+          if (next >= 0) {
+            state.index = next;
+            continue;
+          }
+        }
+        return;
+      }
     }
   }
   function clearResults() {

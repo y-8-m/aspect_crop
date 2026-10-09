@@ -20,6 +20,63 @@ class Element {
   setAttribute() {}
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
+test("corrupt initial references are retried, but later failures preserve the shared crop and exclusions", async () => {
+  const nodes = new Map(), created = [], previews = [];
+  let metadata = [], failures = new Set(), crop = null;
+  globalThis.document = {body: new Element(), createElement: () => {const node = new Element(); created.push(node); return node;}, querySelector: s => {if (!nodes.has(s)) nodes.set(s, new Element()); return nodes.get(s);}, activeElement: null};
+  globalThis.batchRecoveryHarness = {scan: () => metadata};
+  const {createBatchController} = await import(await compile("batchController", {
+    "./batchResultsModal": dataUrl('export const createBatchResultsModal = () => ({open() {}, clear() {}, key() {return false;}});'),
+    "./batchRuntime": dataUrl('export const scanBatch = async () => globalThis.batchRecoveryHarness.scan(); export const runBatch = async () => [];')
+  }));
+  const controller = createBatchController({kind: "tauri"}, {
+    switchMode() {}, clear() {crop = null;},
+    async show(path, initialize) {
+      previews.push(path);
+      if (failures.has(path)) throw Error("Corrupt pixel data");
+      if (initialize) {
+        const reference = controller.reference();
+        crop = {x: 0, y: 0, ...reference};
+      }
+    },
+    crop: () => crop, aspect: () => "1:1", format: () => "png", webpCompression: () => "balanced", lock() {}
+  });
+  const el = id => created.flatMap(node => [...node.children.entries()]).find(([key]) => key === id)?.[1];
+  const image = (name, size) => ({path: `/${name}.png`, name, width: size, height: size, error: null});
+  try {
+    nodes.get(".toolbar").prepended.buttons[1].onclick();
+    metadata = [image("bad1", 100), image("bad2", 150), image("good", 200), image("later", 200), image("different", 300)];
+    failures = new Set(["/bad1.png", "/bad2.png"]);
+    await controller.load(metadata.map(i => i.path));
+    assert.deepEqual(previews, ["/bad1.png", null, "/bad2.png", null, "/good.png"]);
+    assert.deepEqual(controller.reference(), {width: 200, height: 200});
+    assert.deepEqual(crop, {x: 0, y: 0, width: 200, height: 200});
+    assert.equal(el("position").value, "3");
+    assert.equal(el("run").textContent, "Save 2 images");
+    assert.equal(nodes.get("#save-button").disabled, false);
+    // Once initialized, discovering another corrupt image must not reset edits.
+    crop = {x: 10, y: 10, width: 80, height: 80};
+    el("include").onchange();
+    failures.add("/later.png");
+    el("next").onclick(); await tick();
+    assert.deepEqual(controller.reference(), {width: 200, height: 200});
+    assert.deepEqual(crop, {x: 10, y: 10, width: 80, height: 80});
+    assert.equal(el("run").textContent, "Save 0 images");
+    el("prev").onclick(); await tick();
+    assert.equal(el("include").checked, false);
+    // An entirely corrupt list terminates with no reference or enabled save.
+    metadata = [image("bad1", 100), image("bad2", 150)];
+    await controller.load(metadata.map(i => i.path));
+    assert.equal(controller.reference(), null);
+    assert.equal(crop, null);
+    assert.equal(controller.busy(), false);
+    assert.equal(nodes.get("#save-button").disabled, true);
+    assert.equal(el("results").hidden, false);
+  } finally {
+    delete globalThis.document;
+    delete globalThis.batchRecoveryHarness;
+  }
+});
 test("controller preserves navigation, session results and mode-specific save conditions", async () => {
   const workspace = new Element(), toolbar = new Element();
   const nodes = new Map([[".toolbar", toolbar], [".workspace", workspace]]);
