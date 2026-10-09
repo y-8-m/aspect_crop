@@ -39,6 +39,10 @@
         "height": 820,
         "resizable": true
       }
-    ]
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'",
+      "devCsp": "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:5173 http://localhost:5173"
+    }
   }
 }
