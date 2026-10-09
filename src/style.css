@@ -473,7 +473,8 @@ button:hover:not(:disabled) {
   overscroll-behavior: contain;
 }
 
-.save-settings {
+.output-settings,
+.single-save-settings {
   display: grid;
   gap: 12px;
   margin-top: 14px;
@@ -748,14 +749,24 @@ input:focus-visible {
 
 /* Batch metadata stays outside the shared crop editor. */
 [hidden] { display: none !important; }
-.batch-panel { padding: 10px; border: 1px solid var(--border); border-radius: 6px; display: grid; gap: 8px; max-height: 42vh; overflow: auto; font-size: 13px; }
+.batch-panel { padding: 10px; border-top: 1px solid var(--border-subtle); display: grid; gap: 14px; max-height: 42vh; overflow: auto; font-size: 13px; }
 .batch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .batch-row label { display: inline-flex; align-items: center; gap: 6px; }
 .batch-row input[type="checkbox"] { height: 18px; width: 18px; }
 #batch-output { flex: 1; min-width: 150px; }
 .batch-reason { color: var(--danger); }
-.batch-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 140px; overflow: auto; }
 .batch-panel progress { width: 100%; }
 .batch-panel [data-id="name"], .batch-panel [data-id="input"] { overflow-wrap: anywhere; }
 button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .workspace:has(.batch-panel:not([hidden])) { grid-template-rows: minmax(100px, 1fr) auto auto; }
+
+.batch-position { width: 6em; text-align: center; }
+.batch-results-content { grid-template-rows: auto minmax(0, 1fr); }
+.batch-results-body { overflow-y: auto; padding: 12px; }
+.batch-results-body p { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.single-save-settings { padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+.output-settings > .settings-field-help { margin: 0; }
+.batch-section { display: grid; gap: 8px; min-width: 0; }
+.batch-section + .batch-section { border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+.batch-section h3 { margin: 0; font-size: 13px; font-weight: 600; }

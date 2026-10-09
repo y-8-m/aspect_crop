@@ -177,7 +177,7 @@
           <button id="close-ratio-modal" type="button" data-i18n="close"></button>
         </header>
         <div class="settings-tabs" role="tablist" data-i18n-aria-label="settings">
-          <button id="settings-general-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-general-panel" data-settings-tab="general" data-i18n="generalSaveTab"></button>
+          <button id="settings-general-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-general-panel" data-settings-tab="general" data-i18n="generalOutputTab"></button>
           <button id="settings-aspect-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-aspect-panel" tabindex="-1" data-settings-tab="aspect" data-i18n="aspectRatioTab"></button>
         </div>
         <div class="ratio-modal-body">
@@ -189,8 +189,9 @@
                 <label><input type="radio" name="language" value="en" /><span lang="en" data-i18n="english"></span></label>
               </div>
             </section>
-            <section class="save-settings" aria-labelledby="save-settings-title">
-              <h3 id="save-settings-title" data-i18n="saveSection"></h3>
+            <section class="output-settings" aria-labelledby="output-settings-title">
+              <h3 id="output-settings-title" data-i18n="outputSection"></h3>
+              <p class="settings-field-help" data-i18n="sharedOutputHelp"></p>
               <fieldset id="output-format-settings" class="settings-radio-group">
                 <legend data-i18n="exportFormat"></legend>
                 <label><input type="radio" name="output-format" value="same" checked /><span data-i18n="sameAsOriginal"></span></label>
@@ -199,6 +200,9 @@
                 <label><input type="radio" name="output-format" value="webp" /><span data-i18n="webpLossless"></span></label>
                 <label><input type="radio" name="output-format" value="bmp" /><span data-i18n="bmpLossless"></span></label>
               </fieldset>
+            </section>
+            <section id="single-save-settings" class="single-save-settings" aria-labelledby="single-save-title">
+              <h3 id="single-save-title" data-i18n="singleSaveSection"></h3>
               <fieldset id="save-folder-settings" class="settings-radio-group save-folder-settings">
                 <legend data-i18n="saveFolder"></legend>
                 <label><input type="radio" name="save-folder-mode" value="source" checked /><span data-i18n="sourceFolder"></span></label>
