@@ -1,4 +1,6 @@
-use super::{crop_dynamic_image, save_dynamic_image, CropRect, OutputFormat};
+use super::{
+    crop_dynamic_image, save_dynamic_image, CropRect, OutputFormat, WebpCompressionPreset,
+};
 use image::AnimationDecoder;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -44,6 +46,8 @@ pub struct Request {
     height: u32,
     format: String,
     collision: Collision,
+    #[serde(default)]
+    webp_compression: WebpCompressionPreset,
 }
 
 fn supported(path: &Path) -> bool {
@@ -263,29 +267,34 @@ pub fn run(request: Request, progress: impl Fn(Progress)) -> Result<Vec<FileResu
                 .create_new(true)
                 .open(&temp)
                 .map_err(|e| e.to_string())?;
-            let saved =
-                save_dynamic_image(&cropped, &temp.to_string_lossy(), format).and_then(|_| {
-                    if matches!(request.collision, Collision::Overwrite) {
-                        fs::rename(&temp, &destination).map_err(|e| e.to_string())
-                    } else {
-                        // create_new avoids overwriting a file that appeared after collision resolution.
-                        // Copy rather than hard-link so removable filesystems work as well.
-                        let mut target = fs::OpenOptions::new()
-                            .write(true)
-                            .create_new(true)
-                            .open(&destination)
-                            .map_err(|e| e.to_string())?;
-                        let copied = fs::File::open(&temp).and_then(|mut source| {
-                            std::io::copy(&mut source, &mut target)?;
-                            target.sync_all()
-                        });
-                        drop(target);
-                        if copied.is_err() {
-                            let _ = fs::remove_file(&destination);
-                        }
-                        copied.map_err(|e| e.to_string())
+            let saved = save_dynamic_image(
+                &cropped,
+                &temp.to_string_lossy(),
+                format,
+                request.webp_compression,
+            )
+            .and_then(|_| {
+                if matches!(request.collision, Collision::Overwrite) {
+                    fs::rename(&temp, &destination).map_err(|e| e.to_string())
+                } else {
+                    // create_new avoids overwriting a file that appeared after collision resolution.
+                    // Copy rather than hard-link so removable filesystems work as well.
+                    let mut target = fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&destination)
+                        .map_err(|e| e.to_string())?;
+                    let copied = fs::File::open(&temp).and_then(|mut source| {
+                        std::io::copy(&mut source, &mut target)?;
+                        target.sync_all()
+                    });
+                    drop(target);
+                    if copied.is_err() {
+                        let _ = fs::remove_file(&destination);
                     }
-                });
+                    copied.map_err(|e| e.to_string())
+                }
+            });
             let _ = fs::remove_file(&temp);
             saved?;
             Ok("success")
@@ -345,6 +354,7 @@ mod tests {
                 height: 3,
                 format: "same".into(),
                 collision,
+                webp_compression: WebpCompressionPreset::default(),
             }
         }
     }
@@ -353,6 +363,129 @@ mod tests {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
+    #[test]
+    fn webp_encoding_failure_keeps_batch_running_and_existing_output() {
+        let f = Fixture::new();
+        let wide = f.image("wide.png", 16384, 1);
+        let next = f.image("next.png", 16384, 1);
+        fs::create_dir(f.0.join("cropped")).unwrap();
+        fs::write(f.0.join("cropped/wide.webp"), b"keep").unwrap();
+        let mut request = f.request(vec![wide, next], Collision::Overwrite);
+        request.width = 16384;
+        request.height = 1;
+        request.crop = CropRect {
+            x: 0,
+            y: 0,
+            width: 16384,
+            height: 1,
+        };
+        request.format = "webp".into();
+        let progress = std::cell::RefCell::new(Vec::new());
+        let results = run(request, |p| progress.borrow_mut().push(p.completed)).unwrap();
+        assert!(results
+            .iter()
+            .all(|r| r.status == "failed" && r.error.as_ref().unwrap().contains("16383")));
+        assert_eq!(*progress.borrow(), [1, 2]);
+        assert_eq!(fs::read(f.0.join("cropped/wide.webp")).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn single_path_and_memory_use_identical_webp_settings() {
+        let f = Fixture::new();
+        let source = f.image("single.png", 4, 3);
+        for preset in [
+            WebpCompressionPreset::Fast,
+            WebpCompressionPreset::Balanced,
+            WebpCompressionPreset::Smallest,
+        ] {
+            let crop = CropRect {
+                x: 1,
+                y: 1,
+                width: 2,
+                height: 2,
+            };
+            let a = f.0.join("path.webp").to_string_lossy().into_owned();
+            let b = f.0.join("memory.webp").to_string_lossy().into_owned();
+            super::super::crop_image_to_file(
+                source.clone(),
+                a.clone(),
+                crop.clone(),
+                OutputFormat::Webp,
+                preset,
+            )
+            .unwrap();
+            use base64::Engine;
+            let data = base64::engine::general_purpose::STANDARD.encode(fs::read(&source).unwrap());
+            super::super::crop_image_data_to_file(
+                data,
+                b.clone(),
+                crop,
+                OutputFormat::Webp,
+                preset,
+            )
+            .unwrap();
+            let expected = image::open(&source).unwrap().crop_imm(1, 1, 2, 2);
+            assert_eq!(
+                fs::read(&a).unwrap(),
+                &*crate::webp_output::encode(&expected, preset).unwrap()
+            );
+            assert_eq!(fs::read(a).unwrap(), fs::read(b).unwrap());
+        }
+    }
+
+    #[test]
+    fn mixed_same_formats_apply_webp_preset_and_preserve_pixels() {
+        let f = Fixture::new();
+        let paths = vec![
+            f.image("a.webp", 4, 3),
+            f.image("b.png", 4, 3),
+            f.image("c.bmp", 4, 3),
+        ];
+        for preset in [
+            WebpCompressionPreset::Fast,
+            WebpCompressionPreset::Balanced,
+            WebpCompressionPreset::Smallest,
+        ] {
+            let mut request = f.request(paths.clone(), Collision::Overwrite);
+            request.webp_compression = preset;
+            assert!(run(request, |_| {})
+                .unwrap()
+                .iter()
+                .all(|r| r.status == "success"));
+            for path in &paths {
+                let source = image::open(path).unwrap();
+                let dest =
+                    f.0.join("cropped")
+                        .join(Path::new(path).file_name().unwrap());
+                assert_eq!(
+                    image::open(&dest).unwrap().to_rgba8(),
+                    source.crop_imm(1, 1, 2, 2).to_rgba8()
+                );
+                let (format, _) = format_for("same", Path::new(path)).unwrap();
+                let bytes = fs::read(&dest).unwrap();
+                match format {
+                    OutputFormat::Webp => assert_eq!(
+                        bytes,
+                        &*crate::webp_output::encode(&source.crop_imm(1, 1, 2, 2), preset).unwrap()
+                    ),
+                    OutputFormat::Png => assert_eq!(
+                        image::guess_format(&bytes).unwrap(),
+                        image::ImageFormat::Png
+                    ),
+                    OutputFormat::Bmp => assert_eq!(
+                        image::guess_format(&bytes).unwrap(),
+                        image::ImageFormat::Bmp
+                    ),
+                    _ => unreachable!(),
+                }
+            }
+        }
+        assert!(matches!(
+            format_for("webp", Path::new("a.png")).unwrap().0,
+            OutputFormat::Webp
+        ));
+    }
+
     #[test]
     fn preview_preserves_native_pixels_and_rejects_animation() {
         let f = Fixture::new();

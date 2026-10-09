@@ -14,6 +14,8 @@ image = { version = "0.25", default-features = false, features = ["bmp", "gif", 
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "1.6", features = ["dialog-open", "dialog-save", "window-set-position", "window-set-size"] }
 
+webp = { version = "0.3.1", default-features = false }
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

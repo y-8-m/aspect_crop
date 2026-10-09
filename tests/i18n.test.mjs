@@ -48,7 +48,7 @@ test("messages and errors retranslate without changing their values", () => {
   setLanguage("ja");
   assert.equal(translate(message), "<sample>{name}.png を読み込みました。");
   assert.equal(translate(errorMessage(error)), "999以下の値を入力してください。");
-  assert.equal(t("dropHint"), "画像をドロップするか、「開く」から選択してください。");
+  assert.equal(t("dropHint"), "画像をドロップするか、「ファイル選択」から選択してください。");
   assert.equal(t("pngLossless"), "PNG（可逆）");
   assert.equal(t("positiveIntegers"), "1以上の整数を入力してください。");
 });
@@ -65,10 +65,10 @@ test("static DOM labels and accessibility attributes change in place", () => {
   setLanguage("ja");
   assert.equal(root.documentElement.lang, "ja");
   assert.equal(label.textContent, "設定");
-  assert.equal(attributes.get("aria-label"), "画像を開く");
+  assert.equal(attributes.get("aria-label"), "ファイル選択");
   setLanguage("en");
   assert.equal(label.textContent, "Settings");
-  assert.equal(attributes.get("title"), "Open image files");
+  assert.equal(attributes.get("title"), "Select file");
   unsubscribe();
 });
 

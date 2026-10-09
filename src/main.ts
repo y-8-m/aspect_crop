@@ -33,6 +33,9 @@ import {
 } from "./outputFormat";
 import { createRuntimeBridge, type SaveResult } from "./runtimeBridge";
 import {
+  loadWebpCompression,
+  persistWebpCompression,
+  parseWebpCompression,
   loadOutputFormatChoice,
   persistOutputFormatChoice,
   loadSaveFolderSettings,
@@ -152,6 +155,7 @@ const state = {
   aspectPresets: initialAspectPresets,
   selectedAspectId: initialSelectedAspectId,
   outputFormatChoice: initialOutputFormatChoice,
+  webpCompression: loadWebpCompression(),
   isAspectSwapped: false,
   aspect: aspectValueFromPresetId(initialSelectedAspectId, initialAspectPresets),
   crop: null as Rect | null,
@@ -230,7 +234,7 @@ const clearImageButton = document.createElement("button");
 clearImageButton.type = "button";
 openButton.after(clearImageButton);
 function refreshClearImage() {
-  clearImageButton.textContent = getLanguage() === "ja" ? "画像を解除" : "Clear image";
+  clearImageButton.textContent = getLanguage() === "ja" ? "解除" : "Clear";
   clearImageButton.hidden = openButton.hidden;
   clearImageButton.disabled = !state.image;
 }
@@ -250,6 +254,7 @@ clearImageButton.onclick = clearCurrentImage;
 refreshClearImage();
 const batch = createBatchController(runtime, {
   switchMode(isBatch) {
+    if (!isBatch) { statusText.textContent = translate(currentStatus); statusText.classList.remove("error"); }
     if (isBatch) { singleSession = captureEditor(); Object.assign(state, batchSession); }
     else { batchSession = captureEditor(); Object.assign(state, singleSession); }
     state.drag = null;
@@ -257,7 +262,7 @@ const batch = createBatchController(runtime, {
     must<HTMLElement>("#single-save-settings").hidden = isBatch;
     openButton.hidden = isBatch;
     refreshClearImage();
-    saveButton.hidden = isBatch;
+
     syncAspectUi();
     editorZoom.setImage(state.image?.naturalWidth ?? 0, state.image?.naturalHeight ?? 0, true);
     dropHint.classList.toggle("hidden", isBatch || !!state.image);
@@ -290,9 +295,10 @@ const batch = createBatchController(runtime, {
   crop: () => state.crop ? roundedOutputCrop() : null,
   aspect: () => { const d = currentAspectDimensions(); return `${d.width}:${d.height}`; },
   format: () => state.outputFormatChoice,
+  webpCompression: () => state.webpCompression,
   lock(locked, busy) {
     addRatioButton.disabled = busy;
-    for (const selector of [".toolbar-group-aspect", ".toolbar-group-size", "#preview-button", "#save-button", "#editor-viewport"]) {
+    for (const selector of [".toolbar-group-aspect", ".toolbar-group-size", "#preview-button", "#editor-viewport"]) {
       must<HTMLElement>(selector).inert = locked;
     }
   }
@@ -420,6 +426,13 @@ function setupEvents(): void {
     applyAspectPreset(ratioSelect.value);
   });
 
+  must<HTMLFieldSetElement>("#webp-compression-settings").addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== "webp-compression" || !input.checked) return;
+    state.webpCompression = parseWebpCompression(input.value);
+    persistWebpCompression(state.webpCompression);
+  });
+
   outputFormatSettings.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.name !== "output-format" || !input.checked) return;
@@ -480,6 +493,7 @@ function setupEvents(): void {
   });
 
   saveButton.addEventListener("click", async () => {
+    if (batch.active()) { batch.openSave(); return; }
     if (!state.image || !state.crop) {
       return;
     }
@@ -1810,7 +1824,8 @@ async function saveCroppedImage(): Promise<void> {
       defaultName,
       crop,
       outputFormat,
-      initialFolder
+      initialFolder,
+      state.webpCompression
     );
   } else if (isTauriRuntime && source?.kind === "memory") {
     result = await runtime.saveCroppedImageFromBytes(
@@ -1818,7 +1833,8 @@ async function saveCroppedImage(): Promise<void> {
       defaultName,
       crop,
       outputFormat,
-      initialFolder
+      initialFolder,
+      state.webpCompression
     );
   } else {
     const bytes = await makeImageBytes(outputFormat);
@@ -1935,6 +1951,11 @@ function fileNameFromPath(path: string): string {
 }
 
 function syncOutputFormatRadios(): void {
+  const webpSettings = must<HTMLFieldSetElement>("#webp-compression-settings");
+  webpSettings.disabled = !isTauriRuntime;
+  for (const input of webpSettings.querySelectorAll<HTMLInputElement>('input[name="webp-compression"]')) {
+    input.checked = input.value === state.webpCompression;
+  }
   for (const input of outputFormatSettings.querySelectorAll<HTMLInputElement>('input[name="output-format"]')) {
     input.checked = input.value === state.outputFormatChoice;
   }

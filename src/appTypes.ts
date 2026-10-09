@@ -46,3 +46,5 @@ export type LoadedImageSource =
   | { kind: "memory"; bytes: Uint8Array };
 
 export type PathBatchSource = "drop" | "open";
+
+export type WebpCompressionPreset = "fast" | "balanced" | "smallest";

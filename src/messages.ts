@@ -1,10 +1,15 @@
 // Add UI text to both dictionaries. MessageKey keeps their keys in sync.
 // Use {name} placeholders for dynamic values; do not build sentences from fragments.
 export const en = {
+  webpCompression: "WebP lossless compression",
+  webpFast: "Fast",
+  webpBalanced: "Balanced",
+  webpSmallest: "Smallest",
+  webpCompressionHelp: "Desktop WebP output only, including Same as original. All presets preserve pixels. Smaller files take longer to save.",
   language: "Language",
   japanese: "日本語",
   english: "English",
-  open: "Open image files",
+  open: "Select file",
   aspectRatio: "Aspect ratio",
   orientation: "Aspect orientation",
   landscape: "Use landscape orientation",
@@ -126,10 +131,15 @@ export type MessageKey = keyof typeof en;
 export type Language = "ja" | "en";
 
 export const ja: Record<MessageKey, string> = {
+  webpCompression: "WebP ロスレス圧縮",
+  webpFast: "高速",
+  webpBalanced: "標準",
+  webpSmallest: "サイズ優先",
+  webpCompressionHelp: "デスクトップ版のWebP出力専用。「元画像と同じ」にも適用。すべて画素を保持し、容量を優先するほど保存に時間がかかります。",
   language: "言語",
   japanese: "日本語",
   english: "English",
-  open: "画像を開く",
+  open: "ファイル選択",
   aspectRatio: "アスペクト比",
   orientation: "縦横の向き",
   landscape: "横向きにする",
@@ -158,7 +168,7 @@ export const ja: Record<MessageKey, string> = {
   jpegHighestQuality: "JPEG（最高品質）",
   webpLossless: "WebP（可逆）",
   bmpLossless: "BMP（可逆）",
-  dropHint: "画像をドロップするか、「開く」から選択してください。",
+  dropHint: "画像をドロップするか、「ファイル選択」から選択してください。",
   zoom: "表示倍率",
   cropPreview: "クロッププレビュー",
   close: "閉じる",
@@ -235,7 +245,7 @@ export const ja: Record<MessageKey, string> = {
   animatedImage: "アニメーション{format}には対応していません。",
   nativeSaveOnly: "この保存方法はデスクトップ版で利用できます。",
   dropNoPath: "ドロップしたファイルのパスを取得できませんでした。",
-  dropPathDesktop: "パスのドロップはデスクトップ版で利用できます。画像ファイルをドロップするか、「開く」から選択してください。",
+  dropPathDesktop: "パスのドロップはデスクトップ版で利用できます。画像ファイルをドロップするか、「ファイル選択」から選択してください。",
   dropNoImage: "ドロップした内容に読み込める画像がありません。",
   dropNoPayload: "ドロップを検出しましたが、画像データを読み込めませんでした。",
   operationFailed: "処理に失敗しました。",

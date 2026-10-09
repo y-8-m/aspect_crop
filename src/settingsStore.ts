@@ -1,4 +1,4 @@
-import type { OutputFormatChoice } from "./appTypes";
+import type { OutputFormatChoice, WebpCompressionPreset } from "./appTypes";
 import { parseOutputFormatChoice } from "./outputFormat";
 import { parseSaveFolderMode, parentFolder, type SaveFolderMode, type SaveFolderSettings } from "./saveFolder";
 import type { SaveResult } from "./runtimeBridge";
@@ -48,4 +48,15 @@ export function loadOutputFormatChoice(): OutputFormatChoice {
 
 export function persistOutputFormatChoice(choice: OutputFormatChoice): void {
   localStorage.setItem(OUTPUT_FORMAT_STORAGE_KEY, choice);
+}
+
+const WEBP_COMPRESSION_KEY = "aspect-crop.webp-compression-preset";
+export function loadWebpCompression(): WebpCompressionPreset {
+  return parseWebpCompression(localStorage.getItem(WEBP_COMPRESSION_KEY));
+}
+export function parseWebpCompression(value: string | null): WebpCompressionPreset {
+  return value === "fast" || value === "smallest" ? value : "balanced";
+}
+export function persistWebpCompression(preset: WebpCompressionPreset): void {
+  localStorage.setItem(WEBP_COMPRESSION_KEY, preset);
 }

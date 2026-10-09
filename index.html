@@ -10,25 +10,7 @@
     <div id="app">
       <header class="toolbar">
         <div class="toolbar-group toolbar-group-open">
-          <button id="open-button" class="icon-button" type="button" data-i18n-aria-label="open" data-i18n-title="open">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-              <path
-                d="M12 10.5v5M9.5 13h5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-width="1.8"
-              />
-            </svg>
-          </button>
+          <button id="open-button" type="button" data-i18n="open"></button>
           <input
             id="file-input"
             type="file"
@@ -137,11 +119,11 @@
           </div>
           <p class="drop-hint" id="drop-hint" data-i18n="dropHint"></p>
         </section>
-        <div id="editor-zoom-controls" class="zoom-controls" role="group" data-i18n-aria-label="editorZoom">
+        <div class="editor-utility-bar"><div id="editor-zoom-controls" class="zoom-controls" role="group" data-i18n-aria-label="editorZoom">
           <label for="editor-zoom" data-i18n="zoom"></label>
           <input id="editor-zoom" type="range" min="0" max="100" value="100" disabled />
           <output id="editor-zoom-value" for="editor-zoom">100%</output>
-        </div>
+        </div></div>
       </main>
 
       <footer class="status-row">
@@ -199,6 +181,13 @@
                 <label><input type="radio" name="output-format" value="jpeg" /><span data-i18n="jpegHighestQuality"></span></label>
                 <label><input type="radio" name="output-format" value="webp" /><span data-i18n="webpLossless"></span></label>
                 <label><input type="radio" name="output-format" value="bmp" /><span data-i18n="bmpLossless"></span></label>
+              </fieldset>
+              <fieldset id="webp-compression-settings" class="settings-radio-group" aria-describedby="webp-compression-help">
+                <legend data-i18n="webpCompression"></legend>
+                <label><input type="radio" name="webp-compression" value="fast" /><span data-i18n="webpFast"></span></label>
+                <label><input type="radio" name="webp-compression" value="balanced" checked /><span data-i18n="webpBalanced"></span></label>
+                <label><input type="radio" name="webp-compression" value="smallest" /><span data-i18n="webpSmallest"></span></label>
+                <p id="webp-compression-help" class="settings-field-help" data-i18n="webpCompressionHelp"></p>
               </fieldset>
             </section>
             <section id="single-save-settings" class="single-save-settings" aria-labelledby="single-save-title">
