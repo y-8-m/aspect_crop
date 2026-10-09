@@ -112,8 +112,9 @@ fn crop_image_to_file(
     format: OutputFormat,
     webp_compression: WebpCompressionPreset,
 ) -> Result<(), String> {
-    let image =
-        image::open(&source_path).map_err(|error| format!("Failed to open image: {error}"))?;
+    let reader = image::ImageReader::open(&source_path)
+        .map_err(|error| format!("Failed to open image: {error}"))?;
+    let image = decode_oriented(reader, "Failed to open image")?;
     let cropped = crop_dynamic_image(&image, &crop)?;
 
     save_dynamic_image(&cropped, &output_path, format, webp_compression)
@@ -130,11 +131,30 @@ fn crop_image_data_to_file(
     let source_bytes = STANDARD
         .decode(&source_base64)
         .map_err(|error| format!("Failed to decode source image bytes: {error}"))?;
-    let image = image::load_from_memory(&source_bytes)
-        .map_err(|error| format!("Failed to decode source image: {error}"))?;
+    let reader = image::ImageReader::new(std::io::Cursor::new(source_bytes));
+    let image = decode_oriented(reader, "Failed to decode source image")?;
     let cropped = crop_dynamic_image(&image, &crop)?;
 
     save_dynamic_image(&cropped, &output_path, format, webp_compression)
+}
+
+// The editor shows the image through the browser, which applies EXIF orientation.
+// Apply it here too so crop coordinates refer to the same pixels the user saw.
+fn decode_oriented<R: std::io::BufRead + std::io::Seek>(
+    reader: image::ImageReader<R>,
+    context: &str,
+) -> Result<image::DynamicImage, String> {
+    use image::ImageDecoder;
+    let err = |error: image::ImageError| format!("{context}: {error}");
+    let mut decoder = reader
+        .with_guessed_format()
+        .map_err(|error| format!("{context}: {error}"))?
+        .into_decoder()
+        .map_err(err)?;
+    let orientation = decoder.orientation().map_err(err)?;
+    let mut image = image::DynamicImage::from_decoder(decoder).map_err(err)?;
+    image.apply_orientation(orientation);
+    Ok(image)
 }
 
 fn validate_crop_rect(crop: &CropRect, image_width: u32, image_height: u32) -> Result<(), String> {
@@ -229,6 +249,30 @@ mod crop_tests {
         let invalid = CropRect { width: 4, ..crop };
         assert!(crop_dynamic_image(&image, &invalid).is_err());
     }
+
+    #[test]
+    fn exif_orientation_is_applied_before_cropping() {
+        // 4x2 JPEG tagged Orientation=6 (rotate 90 CW) must be treated as 2x4.
+        let mut jpeg = Vec::new();
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(4, 2, image::Rgb([200, 100, 50])))
+            .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+            .unwrap();
+        let exif: Vec<u8> = [
+            b"Exif\0\0".as_slice(),
+            &[b'M', b'M', 0, 42, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0],
+            &[0, 0, 0, 0],
+        ]
+        .concat();
+        let mut tagged = vec![0xFF, 0xD8, 0xFF, 0xE1];
+        tagged.extend(((exif.len() + 2) as u16).to_be_bytes());
+        tagged.extend(&exif);
+        tagged.extend(&jpeg[2..]);
+        let reader = image::ImageReader::new(std::io::Cursor::new(tagged));
+        let image = decode_oriented(reader, "test").unwrap();
+        assert_eq!((image.width(), image.height()), (2, 4));
+        let crop = CropRect { x: 0, y: 0, width: 2, height: 4 };
+        assert!(crop_dynamic_image(&image, &crop).is_ok());
+    }
 }
 
 fn save_dynamic_image(
@@ -275,8 +319,9 @@ fn take_window_file_path(
     }
 }
 
+// Async so window creation does not run on the main thread's command queue (deadlocks on Windows).
 #[tauri::command]
-fn open_image_windows(
+async fn open_image_windows(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     paths: Vec<String>,
