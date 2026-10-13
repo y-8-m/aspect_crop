@@ -1,27 +1,37 @@
 # Aspect Crop
 
-縦横比を固定して、必要な範囲だけを素早く切り抜くためのmacOS向け画像クロップツールです。
+固定アスペクト比での切り抜きに特化した、macOS向け画像クロップツールです。
+
+1枚ずつ編集する **Single** と、同じクロップ範囲を複数画像へまとめて適用する **Batch** の2モードを備えています。
 
 日本語 / English のUIに対応しています。
 
-## 開発背景
+## Overview
 
-画像を決まったアスペクト比に整えて保存したいだけなのに、既存の画像編集アプリでは操作が用途に対して大きすぎたり、固定比率での位置調整がしづらかったり、保存時に意図しない画像形式へ変換されることがありました。
+画像を決まったアスペクト比に整えて保存したいだけなのに、一般的な画像編集アプリでは操作が用途に対して大きすぎたり、固定比率での位置調整や複数画像への同一処理に手間がかかることがありました。
 
-そこで、
+Aspect Cropでは、
 
-- 固定アスペクト比で切り抜く
-- 枠を動かして構図を調整する
+- 固定アスペクト比を選ぶ
+- クロップ枠を動かして構図を調整する
 - 必要ならピクセル単位でサイズを指定する
 - 結果を確認する
 - 指定した形式で保存する
 
-という一連の操作だけを、できるだけ少ない手順で行えるツールとして開発しました。
+という処理に絞っています。
 
-多機能な画像編集ソフトを目指すのではなく、**固定アスペクト比でのクロップ作業に必要な機能だけを持つ小さなデスクトップユーティリティ**を目標としています。
+多機能な画像編集ソフトではなく、**固定アスペクト比でのクロップ作業を少ない操作で行うための小さなデスクトップユーティリティ**として開発しています。
 
-## 主な機能
+---
 
+## Features
+
+### Single crop
+
+1枚の画像を編集・保存するモードです。
+
+- ファイル選択
+- ドラッグ＆ドロップ
 - 固定アスペクト比でのクロップ
 - 横向き / 縦向きの切り替え
 - カスタムアスペクト比の追加・並べ替え・削除
@@ -30,132 +40,313 @@
 - ピクセル単位でのクロップサイズ指定
 - クロップ結果のプレビュー
 - 全体表示〜100%の表示倍率変更
-- PNG / JPEG / WebP / BMPへの出力
-- 元画像形式を維持した保存
-- 保存ダイアログの初期フォルダ設定
-- 複数画像を別ウィンドウで開くデスクトップ動作
-- ウィンドウへのドラッグ＆ドロップ
-- Dock / 起動時の画像ファイル受け取り
-- 日本語 / English UI
+- 保存ダイアログから保存先・ファイル名を指定
+- 複数画像を選択した場合は別ウィンドウで開くデスクトップ動作
 
-## 基本の使い方
+### Batch crop
 
-1. **画像を開く**ボタンから画像を選ぶか、ウィンドウへ画像ファイルをドロップします。
-2. **アスペクト比**を選び、必要に応じて横向き / 縦向きを切り替えます。
-3. クロップ枠をドラッグして位置を調整し、ハンドルをドラッグしてサイズを変更します。
-4. 必要であれば、**クロップサイズ**へ幅・高さを入力してピクセル単位で指定します。
-5. **プレビュー**で切り抜き後の画像を確認します。
-6. **クロップ画像を保存**から保存先とファイル名を指定します。
+同じサイズの複数画像へ、**同一の元画像ピクセル座標のクロップ範囲**をまとめて適用するモードです。
 
-保存時は元画像のピクセル座標を基準に切り抜きます。
+入力方法：
 
-表示倍率は編集画面上の見え方だけに影響し、保存されるクロップ範囲や出力サイズには影響しません。
+- 複数画像を選択
+- フォルダを選択
+- 画像ファイルをドラッグ＆ドロップ
+- フォルダをドラッグ＆ドロップ
 
-デスクトップ版で複数画像を選択またはドロップした場合、それぞれを別ウィンドウで開きます。
+フォルダ入力では、フォルダ直下の対応画像を対象とします。サブフォルダの再帰検索は行いません。
 
-## クロップ枠の操作
+ファイルとフォルダの混在ドロップ、複数フォルダの同時ドロップには対応していません。
+
+Batchでは最初に利用可能な画像のサイズを基準として、
+
+```text
+基準サイズと一致
+→ 処理対象
+
+サイズが異なる
+→ size-mismatch
+→ 処理対象にできない
+
+読み込み不可
+→ invalid
+```
+
+として分類します。
+
+処理可能な画像は、個別に対象 / 除外を切り替えられます。
+
+### Batch navigation
+
+Batch内の画像は、
+
+- 前へ / 次へボタン
+- ← / → キー
+- 画像番号の直接入力
+
+で移動できます。
+
+`Space` キーで現在の画像を処理対象から除外 / 再追加できます。
+
+サイズ不一致画像や読み込み不能画像は確認できますが、処理対象にはできません。
+
+---
+
+## Crop controls
 
 | 操作 | 動作 |
 | --- | --- |
-| 枠の内側をドラッグ | クロップ枠を移動 |
-| ハンドルをドラッグ | 縦横比を維持してサイズ変更 |
-| 幅・高さを入力 | 選択中の縦横比を維持してサイズ指定 |
-| 矢印キー | 元画像上で1px単位で移動 |
-| Shift + 矢印キー | 元画像上で10px単位で移動 |
+| クロップ枠内をドラッグ | クロップ位置を移動 |
+| ハンドルをドラッグ | アスペクト比を維持してリサイズ |
+| 幅・高さを入力 | 選択中の比率を維持してサイズ指定 |
+| 矢印キー | 1px単位で移動 |
+| Shift + 矢印キー | 10px単位で移動 |
 | 画像上でマウスホイール | クロップ枠を中心から拡大・縮小 |
 | + / − キー | クロップ枠を中心から拡大・縮小 |
-| Esc | プレビュー / 設定を閉じる |
 
-キーボード操作は、入力欄などを編集中でない場合に使用できます。
+クロップ範囲は元画像のピクセル座標として保持されます。
 
-マウスホイールや `+` / `−` は**クロップ枠そのもののサイズ**を変更します。画面の表示倍率は別のズームコントロールから変更します。
+表示倍率を変更しても、保存されるクロップ位置や出力サイズは変化しません。
 
-## 表示倍率
+---
 
-クロップ画面とプレビュー画面には、それぞれ独立した表示倍率コントロールがあります。
+## Zoom
 
-表示範囲は**全体表示〜100%**です。
+クロップ画面とプレビュー画面には、それぞれ独立した表示倍率があります。
+
+表示範囲は **全体表示〜100%** です。
 
 - **全体表示**  
-  画像全体が表示領域に収まる倍率です。小さな画像を100%より大きく拡大することはありません。
+  画像全体が表示領域に収まる倍率
 
 - **100%**  
-  元画像を等倍相当で確認するための表示です。
+  元画像を等倍相当で確認する表示
 
-- 画像が表示領域を超えた場合のみスクロールできます。
-- 元画像を100%で全体表示できる場合は、倍率を100%に固定し、スライダーは操作不要な状態になります。
+画像が表示領域を超える場合のみスクロールできます。
 
-クロップ画面とプレビュー画面の倍率は共有しないため、たとえばクロップ画面では全体を確認しつつ、プレビューでは100%で細部を確認できます。
+クロップ画面とプレビュー画面の倍率は共有されません。
 
-## アスペクト比
+---
 
-標準のアスペクト比に加えて、任意の比率を登録できます。
+## Aspect ratios
 
-カスタム比率は設定画面から追加でき、保存済みの比率は並べ替え・削除できます。
-
-たとえば、
+標準で以下のアスペクト比を用意しています。
 
 ```text
-幅 4 : 高さ 5
+16:9
+4:5
+5:7
+4:3
+3:5
+3:2
+2:1
+1:1
 ```
 
-と入力すると `4:5` として登録されます。
+任意の比率をカスタム登録することもできます。
 
-比率は画像のピクセル数ではなく、幅と高さの割合として扱います。
+保存したカスタム比率は、
 
-## 保存形式
+- 選択
+- 並べ替え
+- 削除
 
-設定画面から、保存時の出力形式を選択できます。
+が可能です。
+
+---
+
+## Output formats
+
+以下の出力形式に対応しています。
 
 | 選択肢 | 保存方法 |
 | --- | --- |
-| 元画像と同じ | 元画像と同じ形式で保存 |
-| PNG（可逆） | PNGで保存 |
-| JPEG（最高品質） | JPEGで保存 |
-| WebP（可逆） | 可逆WebPで保存 |
-| BMP（可逆） | BMPで保存 |
+| 元画像と同じ | 元画像の形式を維持 |
+| PNG | 可逆 |
+| JPEG | 最高品質 |
+| WebP | 可逆 |
+| BMP | 可逆 |
 
-静止GIFをGIFのまま保存する場合は、**元画像と同じ**を選択します。
+入力した静止GIFをGIFのまま保存する場合は、**元画像と同じ**を使用します。
 
-クロップ処理は元画像座標を使用し、表示倍率に応じた画像の再縮小・再拡大は行いません。
+JPEGにはアルファチャンネルがないため、透明部分は白背景へ合成して保存します。
 
-## 保存ダイアログの初期フォルダ
+---
 
-保存ダイアログを開いた際の初期フォルダを設定できます。
+## WebP lossless compression
 
-- **元画像と同じフォルダ**  
-  元画像の保存されているフォルダから開始します。
+WebP出力では、3種類のロスレス圧縮プリセットを選択できます。
 
-- **前回保存したフォルダ**  
-  最後に正常保存したファイルのフォルダから開始します。
+| 設定 | 特徴 |
+| --- | --- |
+| 高速 / Fast | 保存時間を優先 |
+| 標準 / Balanced | 初期値 |
+| サイズ優先 / Smallest | ファイルサイズを優先 |
 
-- **指定したフォルダ**  
-  任意の固定フォルダから開始します。
+すべてロスレスで、画素内容は保持されます。
 
-この設定は保存先を自動決定するものではありません。
+違いは主に圧縮処理時間と出力ファイルサイズです。
 
-保存ダイアログを最初に開く位置だけを決めるため、保存時には自由に別のフォルダへ移動できます。
+設定はSingle / Batch共通で、**元画像と同じ**を選択してWebPを出力する場合にも適用されます。
 
-前回保存先が未記録または利用できない場合は、
+現在の内部設定：
+
+| Preset | quality | method |
+| --- | ---: | ---: |
+| Fast | 20 | 0 |
+| Balanced | 75 | 4 |
+| Smallest | 100 | 6 |
+
+lossless時の `quality` は画質ではなく圧縮探索量として使用されます。
+
+---
+
+## Batch output
+
+Batch保存時には、
+
+- 出力フォルダ
+- 出力形式
+- WebP圧縮設定
+- 同名ファイルの扱い
+
+を指定します。
+
+同名ファイルの処理方法：
 
 ```text
-指定フォルダ
-↓
-元画像と同じフォルダ
-↓
-OS側の既定位置
+Rename
+→ 連番を付けて保存
+
+Skip
+→ 既存ファイルをスキップ
+
+Overwrite
+→ 既存ファイルを上書き
 ```
 
-の順でフォールバックします。
+Batch内の複数入力が同じ出力先へ解決される場合は、入力順による上書きを避けるため、その入力を失敗として扱います。
 
-指定フォルダが利用できない場合は、元画像と同じフォルダへフォールバックします。
+例えば、
 
-## 対応画像
+```text
+folder-a/a.png
+folder-b/a.png
+```
+
+や、
+
+```text
+a.png
+a.bmp
+↓ PNG出力
+a.png
+a.png
+```
+
+のようなケースです。
+
+`Overwrite` は既に存在する出力ファイルを上書きするための設定であり、Batch内の画像同士を上書きさせる設定ではありません。
+
+---
+
+## Batch processing
+
+大量画像を扱うことを想定し、Batchでは画像をすべてメモリへ展開して保持しません。
+
+### Scan
+
+入力時の検証では主に、
+
+```text
+形式
+サイズ
+アニメーション判定
+基本的なファイル整合性
+```
+
+を確認します。
+
+全画像のピクセルデータを一度にデコードせず、必要なmetadataを順番に取得します。
+
+### Preview
+
+現在表示している1画像だけを読み込みます。
+
+画像一覧全体のデコード済みキャッシュやサムネイルキャッシュは保持しません。
+
+### Save
+
+保存処理も1画像ずつ順番に行います。
+
+```text
+open
+↓
+decode
+↓
+crop
+↓
+encode
+↓
+save
+↓
+release
+↓
+next
+```
+
+1件の画像処理に失敗しても、可能な限り残りの画像処理を継続します。
+
+---
+
+## Batch safety
+
+Batchでは、個別画像の失敗とBatch全体の問題を分けて扱っています。
+
+### Individual file error
+
+例えば、
+
+- 入力ファイルが削除された
+- ファイルを開けない
+- decodeに失敗した
+- 実行時に画像サイズが変化した
+
+場合は、そのファイルだけを `failed` とし、他の画像の処理を続行します。
+
+### Batch-level error
+
+例えば、
+
+- 出力フォルダを作成できない
+- 出力フォルダへ書き込めない
+- 入力元フォルダそのものを出力先として指定した
+- クロップ範囲自体が不正
+
+といったBatch全体として安全に処理できない場合は、Batchを中止します。
+
+出力時は一度一時ファイルへエンコードしてから最終出力へ反映し、エンコード失敗によって既存ファイルを途中まで破壊しないようにしています。
+
+---
+
+## Initial folder for Single save
+
+Singleの保存ダイアログを開く際の初期フォルダを設定できます。
+
+- 元画像と同じフォルダ
+- 前回保存したフォルダ
+- 指定したフォルダ
+
+この設定は保存先を固定するものではなく、保存ダイアログを最初に開く位置だけを指定します。
+
+---
+
+## Supported images
 
 入力：
 
 - PNG
-- JPEG
+- JPEG / JPG
 - WebP
 - GIF
 - BMP
@@ -164,75 +355,110 @@ OS側の既定位置
 
 以下のアニメーション画像には対応していません。
 
-- GIFアニメーション
+- Animated GIF
 - Animated WebP
 - APNG
 
-## 言語
+---
+
+## Single / Batch sessions
+
+SingleとBatchはそれぞれ独立した編集状態を持ちます。
+
+例えば、
+
+```text
+Singleで画像を編集中
+↓
+Batchへ切り替える
+↓
+Batchを操作
+↓
+Singleへ戻る
+↓
+Singleの編集状態を復元
+```
+
+という使い方ができます。
+
+同じ編集画面を共有しつつ、モードごとの入力画像やクロップ状態を保持しています。
+
+---
+
+## Language
 
 UIは以下に対応しています。
 
 - 日本語
 - English
 
-初回起動時はOS / ブラウザの言語を参照し、日本語環境では日本語、それ以外ではEnglishを使用します。
+初回起動時はOS / ブラウザの言語を参照します。
 
-設定画面で言語を変更した場合は、その設定を保存し、次回起動時にも使用します。
+設定画面で変更した言語は保存され、次回起動時にも使用されます。
 
-## 実装上の方針
+---
 
-### 元画像座標と表示座標を分離
+## Implementation notes
 
-クロップ範囲は元画像のピクセル座標として保持しています。
+### Source coordinates and display coordinates
 
-表示倍率は画面上の描画にのみ適用し、
+クロップ範囲は元画像のピクセル座標で保持します。
 
 ```text
 元画像座標
 ↓
-表示倍率を適用
+表示倍率
 ↓
 画面上の座標
 ```
 
-として扱います。
+表示倍率は画面描画にのみ使用され、保存処理には影響しません。
 
-そのため、表示倍率を変更してもクロップ位置や出力サイズは変化しません。
+### Crop validation
 
-### クロップ値の検証
+保存時にはRust側でもクロップ範囲を検証します。
 
-保存処理では、Rust側でもクロップ範囲を検証しています。
+不正な座標を自動補正して別の範囲を保存するのではなく、処理を失敗させます。
 
-画像範囲外の座標を受け取った場合に値を自動補正して保存するのではなく、不正なクロップ値として処理を中断します。
+これにより、フロントエンド側の座標計算に問題が発生した場合でも、意図しない範囲を保存しにくい構成にしています。
 
-これにより、フロントエンド側の座標計算に不整合が発生した場合でも、別の範囲を意図せず保存してしまうことを防いでいます。
-
-### デスクトップ / ブラウザ処理の分離
+### Desktop / browser separation
 
 デスクトップ版ではTauriを通して、
 
-- ファイル選択
-- ファイル読み込み
+- ファイル / フォルダ選択
+- ネイティブファイルパス
+- Drag & Drop
 - 保存ダイアログ
 - ネイティブ画像保存
+- Batch
 - 複数ウィンドウ
 
-などを扱います。
+を扱います。
 
-ブラウザ実行時にもUIを確認できるようにしており、ブラウザ版では1画像ずつの読み込みとPNG / JPEGのダウンロード保存に対応しています。
+ブラウザ実行は主にUI・Single機能の確認用です。
 
-## 技術構成
+ブラウザではBatchは利用できず、SingleのPNG / JPEGダウンロード保存に対応しています。
+
+---
+
+## Tech stack
 
 - TypeScript
+- HTML / CSS
 - Vite
 - Tauri
 - Rust
 - `image` crate
-- HTML / CSS
+- `webp` / libwebp
 
-UIとクロップ操作はTypeScript側で管理し、デスクトップ環境でのファイル処理や画像の保存処理はTauri / Rust側と連携しています。
+UI、編集状態、座標操作は主にTypeScript側で管理し、画像の検証・クロップ・エンコード・ファイルI/OはRust / Tauri側で処理しています。
 
-## 開発環境
+---
+
+## Development
+
+### Requirements
 
 macOSでの開発には以下が必要です。
 
@@ -240,27 +466,29 @@ macOSでの開発には以下が必要です。
 - Rust / Cargo
 - Xcode Command Line Tools
 
-依存関係をインストールします。
+依存関係をインストール：
 
 ```bash
 npm install
 ```
 
-デスクトップ版を開発起動します。
+デスクトップ版を開発起動：
 
 ```bash
 npm run tauri -- dev
 ```
 
-開発起動時は、利用可能なViteポートを自動選択します。
+開発起動時は利用可能なViteポートを自動選択します。
 
-ブラウザ上でUIを確認する場合：
+ブラウザでUIを確認：
 
 ```bash
 npm run dev
 ```
 
-## テスト
+---
+
+## Tests
 
 TypeScript側：
 
@@ -274,97 +502,67 @@ Rust側：
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-現在、表示倍率・元画像座標との変換、保存先フォルダの選択・フォールバック、保存結果の記録、Rust側のクロップ値検証などをテストしています。
-
-## ビルド
-
-フロントエンドの型チェックとビルド：
+フロントエンドの型チェックとproduction build：
 
 ```bash
 npm run build
 ```
 
-macOS向けデスクトップアプリのビルド：
+テストでは、主に以下を確認しています。
+
+- crop geometry
+- zoom / coordinate conversion
+- language settings
+- save folder settings
+- Single / Batch mode switching
+- Batch classification
+- Batch include / exclude
+- Batch navigation
+- Batch Drag & Drop
+- size mismatch
+- per-file error continuation
+- output collision policies
+- duplicate output destination protection
+- image format handling
+- WebP compression settings
+- existing output protection
+
+---
+
+## Build
+
+macOS向けデスクトップアプリ：
 
 ```bash
 npm run tauri -- build
 ```
 
-Tauriのbundle設定を有効にしているため、macOSでは `.app` bundleを生成できます。
+Tauriのbundle設定により `.app` を生成します。
 
-アプリ名は **Aspect Crop**、bundle identifierは以下です。
+アプリ名：
+
+```text
+Aspect Crop
+```
+
+Bundle identifier：
 
 ```text
 com.y8m.aspectcrop
 ```
 
-## アプリアイコン
-
-アプリアイコンの元データは以下に保存しています。
+現在のpackage version：
 
 ```text
-src-tauri/icons/Aspect_Crop.icon
+0.1.0
 ```
 
-Tauriで使用するPNG・ICNS・ICOも `src-tauri/icons/` に配置しています。
+---
 
-macOS向けアプリでは `icon.icns` をbundleアイコンとして使用します。
+## Current status
 
-## 現在の状態
+現在はmacOS向け個人利用ツールとして開発しています。
 
-現在は個人利用を前提としたmacOS向けツールとして開発しています。
+主要なSingle / Batch crop機能、Drag & Drop、出力設定、テスト、アプリアイコン、macOS向けbundle生成まで実装しています。
 
-主要機能の実装、テスト、アプリアイコン、bundle設定、macOS向け `.app` の生成および実機での起動確認まで完了しています。
-## Batch crop
-
-Switch **Single | Batch** in the toolbar. Single keeps its own image, crop and aspect selection when switching modes.
-
-Batch is available in the Tauri desktop app. Select multiple files or select a folder (only supported files directly inside it are scanned). Validation runs sequentially; the first successfully decoded, non-animated image establishes the reference dimensions. Matching images start included. Different-size and unreadable images remain inspectable in the batch metadata but cannot be included.
-
-Use the existing aspect presets, orientation, custom ratios, drag/resize and pixel-size controls to define **one shared source-pixel rectangle**. Browse with the previous/next buttons or left/right keys, and toggle inclusion with the checkbox or Space. Text fields, selects and open settings/preview dialogs retain their normal keyboard behavior. Different-size previews are read-only; they never rescale or change the shared rectangle.
-
-The suggested output directory is `cropped` beneath the input directory. Choose an output directory and a collision policy (rename, skip or overwrite) before running. Format follows the existing output-format setting; “same” preserves filenames including their extension. The confirmation shows the included count, rectangle, aspect, output directory, format and collision policy. Input directories are rejected as output directories. Source images are never overwritten.
-
-The Rust worker validates and processes images one at a time, rechecking dimensions before cropping. Progress is emitted to the initiating window. File errors are recorded and processing continues; output-directory setup failures stop the run. The expandable results show per-file status and errors. Output is encoded to a temporary file before publishing it, protecting existing files from encoder failures. The image list stores metadata only; previews are loaded on demand without a thumbnail cache.
-
-### Verification
-
-- `npm test`: existing save-folder, language and zoom coverage plus batch classification, inclusion, counts, targets and navigation tests.
-- `npm run build`: TypeScript and production bundle.
-- `cargo test --manifest-path src-tauri/Cargo.toml`: existing crop/save-folder tests plus batch folder scan, exact output pixels, sequential progress, per-file errors, collision policies, format/name preservation and input protection.
-- Browser smoke check: Single loading, aspect/pixel size, zoom, crop preview, PNG download, and mode round trip; Batch UI exercised with mocked Tauri IPC for folder input, arrows/Space, mismatch exclusion, editable-field key handling, confirmation payload and results. Actual image I/O is covered by Rust tests. Native OS dialogs and a several-thousand-image workload still need a desktop acceptance run.
-
-
-### WebP ロスレス圧縮
-
-デスクトップ版の共通出力設定で「高速 / 標準 / サイズ優先」を選べます。すべてロスレスで、画質差はありません。透明部分のRGBを含めて画素を保持し、変わるのは処理時間とファイルサイズのバランスだけです。サイズ優先ほど保存に時間がかかりますが、画像によってサイズの差や大小関係は変わります。
-
-初期値は「標準」。`aspect-crop.webp-compression-preset` に保存され、再起動後も維持されます。Single / Batch共通で、「元画像と同じ」でWebPを保存するときにも適用されます。混在Batchの他形式には影響しません。ブラウザプレビューではこの設定は使用できません。
-
-内部実装は `webp 0.3.1`（default features無効）と `libwebp-sys 0.9.6`。Singleのパス／メモリ保存とBatchは `save_dynamic_image` から同じエンコーダを使用します。全プリセットで `lossless=1`, `near_lossless=100`, `exact=1`。libwebpのlossless時のqualityは探索量であり、画質設定ではありません。
-
-| プリセット | quality（探索量） | method |
-| --- | ---: | ---: |
-| 高速 / fast | 20 | 0 |
-| 標準 / balanced | 75 | 4 |
-| サイズ優先 / smallest | 100 | 6 |
-
-追加依存は `webp`, `libwebp-sys`, `jobserver`。libwebpは同梱Cソースから静的ビルドされ、Cコンパイラが必要ですが、別途libwebpのインストールやCMakeは不要です。macOSでビルド・テスト確認済み。bindingのビルド処理はWindows MSVCにも対応していますが、Windows実機ビルドは未確認です。Tauriの依存指定 `1.6` は変更していません（現行lockは1.8.3）。
-
-Rust要件には既存の不一致があります。Cargo.tomlの宣言は1.70ですが、現行lockの `image 0.25.10` は1.88以上が必要です。追加された `jobserver 0.1.35` は1.85以上を要求するため、既存lockの実質要件は上がりません。今回の検証はRust 1.93.1で実施し、1.70互換性は保証しません。
-
-開発用比較（1024×768の決定的な合成UI fixture：パネル、文字風ストローク、イラスト、テクスチャ付きグラデーション）：
-
-```sh
-cargo test --manifest-path src-tauri/Cargo.toml --no-default-features webp_comparison -- --ignored --nocapture
-```
-
-macOS / debugビルドでの1回の参考値（実写写真や実際のスクリーンショットではなく合成画像。環境・画像により変動）：
-
-| プリセット | 出力サイズ | エンコード時間 |
-| --- | ---: | ---: |
-| fast | 197,290 bytes | 38.35 ms |
-| balanced | 130,966 bytes | 554.77 ms |
-| smallest | 89,562 bytes | 1,763.99 ms |
-
-比較コードは全プリセットのデコード後画素一致も確認します。通常テストには透明／半透明RGBA、設定永続化、モード切替、Singleのパス／メモリ保存、混在形式Batch、WebPエラー後の続行・既存ファイル保護を含みます。サイズの固定比率はテスト条件にしていません。
+Windows向けの実機検証は現時点では行っていません。
