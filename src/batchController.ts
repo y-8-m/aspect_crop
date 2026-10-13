@@ -8,6 +8,7 @@ import { outputFormatLabel } from "./outputFormat";
 import { getLanguage, onLanguageChange, t } from "./i18n";
 
 type Editor = {
+  hint?(active: boolean, hasSession: boolean): void;
   clear(): void;
   switchMode(batch: boolean): void;
   show(path: string | null, initialize: boolean): Promise<void>;
@@ -61,6 +62,7 @@ export function createBatchController(runtime: RuntimeBridge, editor: Editor) {
     el("format").textContent = `${t("exportFormat")}: ${format === "same" ? t("sameAsOriginal") : outputFormatLabel(format)}`;
   }
   function refresh() {
+    editor.hint?.(active, state.images.length > 0);
     input.hidden = navigation.hidden = summary.hidden = !active;
     el("save-title").textContent = tr("Batch保存", "Save batch");
     el("cancel").textContent = tr("キャンセル", "Cancel");
@@ -236,6 +238,25 @@ export function createBatchController(runtime: RuntimeBridge, editor: Editor) {
     editable: () => !active || (!busy && ["included", "excluded"].includes(state.images[state.index]?.status)),
     reference: () => active ? state.reference : null,
     load,
+    async drop(paths: string[], supportedUniquePaths: (paths: string[]) => string[]) {
+      if (!active || busy) return;
+      let rejected = "";
+      await guarded(async () => {
+        const unique = [...new Set(paths)];
+        const directories = await runtime.droppedDirectories(unique);
+        if (directories.length && (directories.length !== 1 || unique.length !== 1)) {
+          rejected = t("batchDropMixed");
+          return;
+        }
+        if (directories.length === 1) await scanIntoSession([], directories[0]);
+        else {
+          const images = supportedUniquePaths(unique);
+          if (!images.length) { rejected = t("noSupportedImages"); return; }
+          await scanIntoSession(images);
+        }
+      });
+      if (rejected) setReport(rejected);
+    },
     key(event: KeyboardEvent): boolean {
       if (!active) return false;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.code === "Space") {

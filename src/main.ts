@@ -253,6 +253,11 @@ function clearCurrentImage(): void {
 clearImageButton.onclick = clearCurrentImage;
 refreshClearImage();
 const batch = createBatchController(runtime, {
+  hint(active, hasSession) {
+    dropHint.dataset.i18n = active ? "batchDropHint" : "dropHint";
+    dropHint.textContent = t(active ? "batchDropHint" : "dropHint");
+    dropHint.classList.toggle("hidden", active ? hasSession : !!state.image);
+  },
   switchMode(isBatch) {
     if (!isBatch) { statusText.textContent = translate(currentStatus); statusText.classList.remove("error"); }
     if (isBatch) { singleSession = captureEditor(); Object.assign(state, batchSession); }
@@ -265,14 +270,13 @@ const batch = createBatchController(runtime, {
 
     syncAspectUi();
     editorZoom.setImage(state.image?.naturalWidth ?? 0, state.image?.naturalHeight ?? 0, true);
-    dropHint.classList.toggle("hidden", isBatch || !!state.image);
+
     previewButton.disabled = !state.image;
     saveButton.disabled = !state.image;
     renderCropState();
   },
   clear() {
     clearCurrentImage();
-    dropHint.classList.add("hidden");
   },
   async show(path, initialize) {
     // Release the old preview before loading another; no decoded-image cache grows with the list.
@@ -309,6 +313,8 @@ function editorDimensions(): { width: number; height: number } {
 
 const fileDropController = createFileDropController({
   runtimeKind: runtime.kind,
+  batchActive: () => batch.active(),
+  loadBatchDrop: paths => batch.drop(paths, supportedUniquePaths),
   dropZone,
   bindNativeDrop: isTauriRuntime ? (listener) => runtime.onNativeFileDrop(listener) : undefined,
   loadPathBatch: async (paths) => {

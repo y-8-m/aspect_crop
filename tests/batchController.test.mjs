@@ -173,3 +173,50 @@ test("controller preserves navigation, session results and mode-specific save co
   delete globalThis.batchTestRun;
   delete globalThis.batchTestModal; delete globalThis.document; delete globalThis.window;
 });
+
+test("Batch drops share scan/session, reject mixed input, and restore empty hints", async () => {
+  const nodes = new Map(), created = [], scans = [], hints = [];
+  globalThis.document = {body: new Element(), createElement: () => {const node = new Element(); created.push(node); return node;}, querySelector: s => {if (!nodes.has(s)) nodes.set(s, new Element()); return nodes.get(s);}, activeElement: null};
+  globalThis.dropScan = (paths, folder, progress) => {
+    scans.push({paths, folder});
+    progress({completed: 1, total: 1, name: "a.png"});
+    return (folder ? [folder + "/a.png"] : paths).map(path => ({path, name: path, width: 100, height: 100, error: null}));
+  };
+  const {createBatchController} = await import(await compile("batchController", {
+    "./batchResultsModal": dataUrl('export const createBatchResultsModal = () => ({open() {}, clear() {}, key() {return false;}});'),
+    "./batchRuntime": dataUrl('export const scanBatch = async (...args) => globalThis.dropScan(...args); export const runBatch = async () => [];')
+  }));
+  const controller = createBatchController({kind: "tauri", droppedDirectories: async paths => paths.filter(p => p.startsWith("/folder"))}, {
+    hint: (...args) => hints.push(args), switchMode() {}, clear() {}, async show() {},
+    crop: () => null, aspect: () => "1:1", format: () => "png", webpCompression: () => "balanced", lock() {}
+  });
+  const el = id => created.flatMap(node => [...node.children.entries()]).find(([key]) => key === id)?.[1];
+  const modes = nodes.get(".toolbar").prepended.buttons;
+  const supported = paths => paths.filter(p => p.endsWith(".png"));
+  try {
+    assert.deepEqual(hints.at(-1), [false, false]);
+    modes[1].onclick();
+    assert.deepEqual(hints.at(-1), [true, false]);
+    for (const paths of [["/a.png"], ["/a.png", "/b.png"]]) {
+      await controller.drop(paths, supported);
+      assert.deepEqual(scans.at(-1), {paths, folder: null});
+      assert.deepEqual(hints.at(-1), [true, true]);
+      assert.equal(el("total").textContent, "/ " + paths.length);
+      assert.equal(el("progress").value, 1);
+    }
+    await controller.drop(["/folder.png"], supported); // A directory can have an image extension.
+    assert.deepEqual(scans.at(-1), {paths: [], folder: "/folder.png"});
+    const count = scans.length;
+    for (const paths of [["/a.png", "/folder"], ["/folder", "/folder2"]]) {
+      await controller.drop(paths, supported);
+      assert.equal(scans.length, count);
+      assert.match(nodes.get("#status-text").textContent, /not supported/);
+      assert.deepEqual(hints.at(-1), [true, true]);
+    }
+    modes[0].onclick(); modes[1].onclick();
+    assert.equal(el("total").textContent, "/ 1");
+    assert.deepEqual(hints.at(-1), [true, true]);
+    el("clear").onclick();
+    assert.deepEqual(hints.at(-1), [true, false]);
+  } finally { delete globalThis.document; delete globalThis.dropScan; }
+});

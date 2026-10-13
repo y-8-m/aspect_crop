@@ -25,6 +25,11 @@ async fn read_batch_preview(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn dropped_directories(paths: Vec<String>) -> Vec<String> {
+    paths.into_iter().filter(|path| Path::new(path).is_dir()).collect()
+}
+
+#[tauri::command]
 async fn scan_batch(
     window: tauri::Window,
     paths: Vec<String>,
@@ -451,6 +456,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             read_batch_preview,
             scan_batch,
+            dropped_directories,
             run_batch,
             read_image_file,
             is_save_folder_available,

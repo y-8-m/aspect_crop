@@ -9,6 +9,8 @@ type FileDropControllerOptions = {
   runtimeKind: "tauri" | "web";
   dropZone: HTMLDivElement;
   bindNativeDrop?: (listener: (payload: NativeFileDropPayload) => void) => Promise<void>;
+  batchActive?: () => boolean;
+  loadBatchDrop?: (paths: string[]) => Promise<void>;
   loadPathBatch: (paths: string[]) => Promise<void>;
   loadFile: (file: File) => Promise<string>;
   onStatus: (message: Message, isError?: boolean) => void;
@@ -73,7 +75,7 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
 
           lastNativeDropAtMs = Date.now();
           options.dropZone.classList.remove("drag-active");
-          const paths = options.supportedUniquePaths(payload.paths);
+          const paths = options.batchActive?.() ? payload.paths : options.supportedUniquePaths(payload.paths);
           if (paths.length === 0) {
             options.onStatus(msg("dropNoPath"), true);
             return;
@@ -94,6 +96,10 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
     try {
       const files = Array.from(event.dataTransfer?.files ?? []);
       if (files.length > 0) {
+        if (options.batchActive?.() && options.runtimeKind !== "tauri") {
+          options.onStatus(msg("desktopPaths"), true);
+          return;
+        }
         if (options.runtimeKind === "tauri") {
           scheduleNativeDropFallbackCheck(() => {
             void handleDroppedFileFallback(files);
@@ -120,7 +126,8 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
       }
 
       const uriList = event.dataTransfer?.getData("text/uri-list") ?? "";
-      const paths = options.supportedUniquePaths(filePathsFromUriList(uriList));
+      const rawPaths = filePathsFromUriList(uriList);
+      const paths = options.batchActive?.() ? rawPaths : options.supportedUniquePaths(rawPaths);
       if (paths.length > 0) {
         if (options.runtimeKind === "tauri") {
           scheduleNativeDropFallbackCheck(() => {
@@ -149,7 +156,8 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
   async function handleDroppedPathBatch(paths: string[]): Promise<void> {
     try {
       await runDropAction(dropBatchSignatureFromPaths(paths), async () => {
-        await options.loadPathBatch(paths);
+        if (options.batchActive?.()) await options.loadBatchDrop?.(paths);
+        else await options.loadPathBatch(paths);
       });
     } catch (error) {
       options.onStatus(options.formatError(error), true);
@@ -157,6 +165,10 @@ export function createFileDropController(options: FileDropControllerOptions): Fi
   }
 
   async function handleDroppedFileFallback(files: File[]): Promise<void> {
+    if (options.batchActive?.()) {
+      options.onStatus(msg("dropNoPath"), true);
+      return;
+    }
     const [firstFile] = files;
     if (!firstFile) {
       options.onStatus(msg("dropNoPayload"), true);

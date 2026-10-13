@@ -28,6 +28,7 @@ export type RuntimeBridge = {
   getWindowLabel(): Promise<string>;
   openImageDialog(extensions: string[]): Promise<string[]>;
   readImageBytes(path: string): Promise<Uint8Array>;
+  droppedDirectories(paths: string[]): Promise<string[]>;
   readBatchPreview(path: string): Promise<Uint8Array>;
   openImageWindows(paths: string[], templateBounds: WindowBounds | null): Promise<void>;
   takeStartupPath(): Promise<string | null>;
@@ -83,6 +84,9 @@ function createTauriRuntimeBridge(): RuntimeBridge {
       }
 
       return Array.isArray(selection) ? selection : [selection];
+    },
+    async droppedDirectories(paths: string[]): Promise<string[]> {
+      return invoke("dropped_directories", { paths });
     },
     async readBatchPreview(path: string): Promise<Uint8Array> {
       return base64ToBytes(await invoke<string>("read_batch_preview", { path }));
@@ -248,6 +252,7 @@ function createWebRuntimeBridge(): RuntimeBridge {
     async openImageDialog(): Promise<string[]> {
       return [];
     },
+    async droppedDirectories(): Promise<string[]> { throw new LocalizedError("desktopPaths"); },
     async readBatchPreview(): Promise<Uint8Array> {
       throw new LocalizedError("desktopPaths");
     },

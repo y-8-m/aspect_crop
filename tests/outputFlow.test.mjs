@@ -112,3 +112,32 @@ test("Single resolves same + WebP before passing the preset for path and memory 
   }
   delete globalThis.localStorage;
 });
+
+test("actual mode switch preserves Single image and uses mode-specific session hints", () => {
+  const hint = batchDeclaration.initializer.arguments[1].properties.find(node => node.name?.getText(ast) === "hint").getText(ast);
+  const image = {naturalWidth: 640, naturalHeight: 480};
+  const state = {image: null, imageName: "", imageSource: null, crop: null};
+  const dropHint = {dataset: {}, classList: {toggle(name, value) {dropHint.hidden = value;}}};
+  const context = vm.createContext({
+    state, dropHint, t: key => key, statusText: {classList: {remove() {}}}, translate: v => v, currentStatus: "",
+    must: () => ({}), clearPreview() {}, refreshClearImage() {}, openButton: {}, saveButton: {}, previewButton: {},
+    syncAspectUi() {}, editorZoom: {setImage() {}}, renderCropState() {}
+  });
+  run(`${functions(["captureEditor"])}; let singleSession = captureEditor(); let batchSession = captureEditor(); const editor = {${switchMode}, ${hint}};`, context);
+  run("editor.hint(false, false)", context);
+  assert.equal(dropHint.hidden, false);
+  assert.equal(dropHint.dataset.i18n, "dropHint");
+  state.image = image; state.imageName = "single.png";
+  run("editor.hint(false, false); editor.switchMode(true); editor.hint(true, false)", context);
+  assert.equal(state.image, null);
+  assert.equal(dropHint.hidden, false);
+  assert.equal(dropHint.dataset.i18n, "batchDropHint");
+  run("editor.switchMode(false); editor.hint(false, false)", context);
+  assert.equal(state.image, image);
+  assert.equal(state.imageName, "single.png");
+  assert.equal(dropHint.hidden, true);
+  run("editor.switchMode(true); editor.hint(true, true)", context);
+  assert.equal(dropHint.hidden, true, "invalid-only Batch session hides hint even without preview");
+  run("editor.hint(true, false)", context);
+  assert.equal(dropHint.hidden, false);
+});
