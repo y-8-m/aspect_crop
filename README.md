@@ -6,6 +6,27 @@
 
 日本語 / English のUIに対応しています。
 
+## Screenshots
+
+### Single mode
+
+<img src="screenshots/single.png" alt="Aspect Crop - Single mode" width="720">
+
+### Batch mode
+
+<img src="screenshots/batch.png" alt="Aspect Crop - Batch mode" width="720">
+
+<details>
+<summary>Initial screen / 初期画面</summary>
+
+<br>
+
+<img src="screenshots/initial.png" alt="Aspect Crop - Initial screen" width="720">
+
+</details>
+
+---
+
 ## Overview
 
 画像を決まったアスペクト比に整えて保存したいだけなのに、一般的な画像編集アプリでは操作が用途に対して大きすぎたり、固定比率での位置調整や複数画像への同一処理に手間がかかることがありました。
